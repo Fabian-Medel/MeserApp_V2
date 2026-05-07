@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'staff.dart';
 import 'mesas.dart';
 import 'login.dart';
+import 'contenedor_staff.dart';
 
 class Inicio extends StatelessWidget {
   const Inicio({super.key});
@@ -47,7 +47,7 @@ class Inicio extends StatelessWidget {
                 if (usuario != null && usuario.emailVerified) {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const Staff()),
+                    MaterialPageRoute(builder: (_) => const ContenedorStaff()),
                   );
                 } else {
                   Navigator.push(

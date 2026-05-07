@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'inicio.dart';
 
 class PerfilUsuario extends StatefulWidget {
@@ -10,22 +11,94 @@ class PerfilUsuario extends StatefulWidget {
 }
 
 class _PerfilUsuarioState extends State<PerfilUsuario> {
-  User? usuario = FirebaseAuth.instance.currentUser;
-  final _nombreEditCtrl = TextEditingController();
+  final User? usuario = FirebaseAuth.instance.currentUser;
+
+  String _nombre = '';
+  String _telefono = 'Sin configurar';
+  String _direccion = 'Sin configurar';
+  bool _cargando = true;
+
+  final _nombreCtrl = TextEditingController();
+  final _telefonoCtrl = TextEditingController();
+  final _direccionCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarDatosRestaurante();
+  }
+
+  void _cargarDatosRestaurante() async {
+    if (usuario == null) return;
+
+    try {
+      final documento = await FirebaseFirestore.instance
+          .collection('restaurantes')
+          .doc(usuario!.uid)
+          .get();
+
+      if (documento.exists) {
+        final datos = documento.data() as Map<String, dynamic>;
+        setState(() {
+          _nombre = datos['nombre'] ?? usuario!.displayName ?? 'Sin nombre';
+          _telefono = datos['telefono'] ?? 'Sin configurar';
+          _direccion = datos['direccion'] ?? 'Sin configurar';
+        });
+      } else {
+        setState(() {
+          _nombre = usuario!.displayName ?? 'Sin nombre';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al cargar datos'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _cargando = false;
+        });
+      }
+    }
+  }
 
   void _mostrarDialogoEdicion() {
-    _nombreEditCtrl.text = usuario?.displayName ?? '';
+    _nombreCtrl.text = _nombre;
+    _telefonoCtrl.text = _telefono == 'Sin configurar' ? '' : _telefono;
+    _direccionCtrl.text = _direccion == 'Sin configurar' ? '' : _direccion;
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Editar Nombre del Restaurante'),
-          content: TextField(
-            controller: _nombreEditCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Nuevo nombre',
-              hintText: 'Ej: Las Viejas Cochinas',
+          title: const Text('Editar Perfil'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _nombreCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre del Restaurante',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _telefonoCtrl,
+                  decoration: const InputDecoration(labelText: 'Teléfono'),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _direccionCtrl,
+                  decoration: const InputDecoration(labelText: 'Dirección'),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -34,7 +107,7 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
               child: const Text('Cancelar'),
             ),
             ElevatedButton(
-              onPressed: () => _guardarNombre(),
+              onPressed: _guardarDatos,
               child: const Text('Guardar'),
             ),
           ],
@@ -43,25 +116,47 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
     );
   }
 
-  void _guardarNombre() async {
-    String nuevoNombre = _nombreEditCtrl.text.trim();
+  void _guardarDatos() async {
+    if (usuario == null) return;
 
-    if (nuevoNombre.isEmpty) return;
+    final nuevoNombre = _nombreCtrl.text.trim();
+    final nuevoTelefono = _telefonoCtrl.text.trim();
+    final nuevaDireccion = _direccionCtrl.text.trim();
+
+    if (nuevoNombre.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('El nombre es obligatorio'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    Navigator.pop(context);
+
+    setState(() {
+      _cargando = true;
+    });
 
     try {
-      await usuario?.updateDisplayName(nuevoNombre);
+      await usuario!.updateDisplayName(nuevoNombre);
 
-      await usuario?.reload();
+      await FirebaseFirestore.instance
+          .collection('restaurantes')
+          .doc(usuario!.uid)
+          .set({
+            'nombre': nuevoNombre,
+            'telefono': nuevoTelefono,
+            'direccion': nuevaDireccion,
+          }, SetOptions(merge: true));
 
-      setState(() {
-        usuario = FirebaseAuth.instance.currentUser;
-      });
+      _cargarDatosRestaurante();
 
       if (mounted) {
-        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Nombre actualizado con éxito'),
+            content: Text('Perfil actualizado'),
             backgroundColor: Colors.green,
           ),
         );
@@ -70,11 +165,14 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Error al actualizar el nombre'),
+            content: Text('Error al guardar'),
             backgroundColor: Colors.red,
           ),
         );
       }
+      setState(() {
+        _cargando = false;
+      });
     }
   }
 
@@ -89,80 +187,121 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
         backgroundColor: Colors.indigo,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(25.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: Colors.indigo.shade100,
-                backgroundImage: usuario?.photoURL != null
-                    ? NetworkImage(usuario!.photoURL!)
-                    : null,
-                child: usuario?.photoURL == null
-                    ? const Icon(Icons.store, size: 60, color: Colors.indigo)
-                    : null,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                usuario?.displayName ?? 'Restaurante sin nombre',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                usuario?.email ?? '',
-                style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
-              ),
-              const Spacer(),
-
-              ElevatedButton.icon(
-                icon: const Icon(Icons.edit),
-                label: const Text('Editar Nombre'),
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  backgroundColor: Colors.indigo,
-                  foregroundColor: Colors.white,
-                ),
-                onPressed: _mostrarDialogoEdicion,
-              ),
-              const SizedBox(height: 15),
-
-              OutlinedButton.icon(
-                icon: const Icon(Icons.logout, color: Colors.red),
-                label: const Text(
-                  'Cerrar Sesión',
-                  style: TextStyle(color: Colors.red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                  side: const BorderSide(color: Colors.red),
-                ),
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Sesión cerrada correctamente'),
-                        backgroundColor: Colors.blueGrey,
+      body: _cargando
+          ? const Center(child: CircularProgressIndicator())
+          : Center(
+              child: Padding(
+                padding: const EdgeInsets.all(25.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    CircleAvatar(
+                      radius: 60,
+                      backgroundColor: Colors.indigo.shade100,
+                      backgroundImage: usuario?.photoURL != null
+                          ? NetworkImage(usuario!.photoURL!)
+                          : null,
+                      child: usuario?.photoURL == null
+                          ? const Icon(
+                              Icons.store,
+                              size: 60,
+                              color: Colors.indigo,
+                            )
+                          : null,
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      _nombre,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(builder: (_) => const Inicio()),
-                      (route) => false,
-                    );
-                  }
-                },
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      usuario?.email ?? '',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.phone, size: 18, color: Colors.grey),
+                        const SizedBox(width: 5),
+                        Text(
+                          _telefono,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 18,
+                          color: Colors.grey,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          _direccion,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Editar Información'),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: _mostrarDialogoEdicion,
+                    ),
+                    const SizedBox(height: 15),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.logout, color: Colors.red),
+                      label: const Text(
+                        'Cerrar Sesión',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                      onPressed: () async {
+                        await FirebaseAuth.instance.signOut();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Sesión cerrada correctamente'),
+                              backgroundColor: Colors.blueGrey,
+                            ),
+                          );
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(builder: (_) => const Inicio()),
+                            (route) => false,
+                          );
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 }

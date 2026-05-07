@@ -57,8 +57,7 @@ class Carrito extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(color: Colors.grey.shade200),
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.stretch, // Estira los botones
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
                   'Total a pagar: \$${appState.totalCarrito}',

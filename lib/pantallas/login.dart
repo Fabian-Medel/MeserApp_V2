@@ -1,8 +1,9 @@
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'staff.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'registro.dart';
+import 'contenedor_staff.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -140,7 +141,7 @@ class LoginState extends State<Login> {
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const Staff()),
+          MaterialPageRoute(builder: (_) => const ContenedorStaff()),
         );
       }
     } on FirebaseAuthException catch (e) {
@@ -184,12 +185,26 @@ class LoginState extends State<Login> {
           idToken: authGoogle.idToken,
         );
 
-        await FirebaseAuth.instance.signInWithCredential(credential);
+        final credencialFirebase = await FirebaseAuth.instance
+            .signInWithCredential(credential);
+        final usuario = credencialFirebase.user;
+
+        if (usuario != null) {
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(usuario.uid)
+              .set({
+                'nombre': usuario.displayName ?? 'Restaurante nuevo',
+                'telefono': 'Sin configurar',
+                'direccion': 'Sin configurar',
+                'mesas': [0, 0, 0, 0, 0, 0],
+              }, SetOptions(merge: true));
+        }
 
         if (mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const Staff()),
+            MaterialPageRoute(builder: (_) => const ContenedorStaff()),
           );
         }
       }

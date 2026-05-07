@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'login.dart';
 
 class Registro extends StatefulWidget {
@@ -95,7 +96,20 @@ class _PantallaRegistroState extends State<Registro> {
       final usuario = credencial.user;
 
       if (usuario != null) {
-        await usuario.updateDisplayName(_nombreRestCtrl.text.trim());
+        String nombreFinal = _nombreRestCtrl.text.trim();
+        if (nombreFinal.isEmpty) nombreFinal = 'Restaurante nuevo';
+
+        await usuario.updateDisplayName(nombreFinal);
+
+        await FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(usuario.uid)
+            .set({
+              'nombre': nombreFinal,
+              'telefono': 'Sin configurar',
+              'direccion': 'Sin configurar',
+              'mesas': [0, 0, 0, 0, 0, 0],
+            });
       }
 
       if (usuario != null && !usuario.emailVerified) {

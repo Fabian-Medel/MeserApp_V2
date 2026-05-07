@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
-
 import 'package:mobile_scanner/mobile_scanner.dart';
-
 import '../estado/app_state.dart';
 import 'menu.dart';
 
 class LectorQR extends StatefulWidget {
   final int indexMesa;
-  const LectorQR({super.key, required this.indexMesa});
+  final String idRestauranteDetectado;
+
+  const LectorQR({
+    super.key,
+    required this.indexMesa,
+    required this.idRestauranteDetectado,
+  });
 
   @override
   State<LectorQR> createState() => _LectorQRState();
@@ -19,7 +23,11 @@ class _LectorQRState extends State<LectorQR> {
   void procesarEscaneoExitoso() {
     if (!yaDetectado) {
       yaDetectado = true;
+
+      appState.setRestauranteId(widget.idRestauranteDetectado);
+
       appState.ocuparMesa(widget.indexMesa);
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Menu()),
@@ -31,24 +39,13 @@ class _LectorQRState extends State<LectorQR> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Escanear QR de la Mesa',
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text('Escanear QR'),
         backgroundColor: Colors.black,
-        iconTheme: const IconThemeData(color: Colors.white),
+        foregroundColor: Colors.white,
       ),
       body: Stack(
         children: [
-          MobileScanner(
-            onDetect: (capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty) {
-                procesarEscaneoExitoso();
-              }
-            },
-          ),
-
+          MobileScanner(onDetect: (capture) => procesarEscaneoExitoso()),
           Center(
             child: Container(
               width: 250,
@@ -59,23 +56,6 @@ class _LectorQRState extends State<LectorQR> {
               ),
             ),
           ),
-
-          const Positioned(
-            top: 50,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Text(
-                'Apunta a cualquier QR',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  backgroundColor: Colors.black54,
-                ),
-              ),
-            ),
-          ),
-
           Positioned(
             bottom: 40,
             left: 0,
@@ -88,7 +68,6 @@ class _LectorQRState extends State<LectorQR> {
                   backgroundColor: Colors.green,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(250, 55),
-                  textStyle: const TextStyle(fontSize: 18),
                 ),
                 onPressed: procesarEscaneoExitoso,
               ),

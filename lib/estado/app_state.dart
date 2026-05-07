@@ -1,39 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AppState extends ChangeNotifier {
-  //Estado de uan mesa (libre, ocupada, limpiando)
-  List<int> mesas = [0, 0, 0, 0, 0, 0];
-
+  String? restauranteId;
   int? mesaSeleccionada;
-
+  List<Map<String, dynamic>> carrito = [];
   List<Map<String, dynamic>> notificaciones = [];
 
-  //Menu predeterminado
-  final List<Map<String, dynamic>> menu = [
-    {'nombre': 'Pizza Mechada', 'precio': 14000, 'icono': Icons.local_pizza},
-    {
-      'nombre': 'Hamburguesa Casera',
-      'precio': 9500,
-      'icono': Icons.lunch_dining,
-    },
-    {'nombre': 'Tabla Sushi (12p)', 'precio': 11000, 'icono': Icons.set_meal},
-    {'nombre': 'Limonada Menta', 'precio': 3500, 'icono': Icons.local_drink},
-  ];
-
-  List<Map<String, dynamic>> carrito = [];
-
-  //Validacion de usuario y clave staff
-  bool loginStaff(String user, String pass) {
-    return user == 'admin' && pass == '1234';
+  void setRestauranteId(String id) {
+    restauranteId = id;
+    notifyListeners();
   }
 
-  //Funcion para añadir pedido al carrito
+  Future<void> actualizarMesaEnFirebase(int index, int nuevoEstado) async {
+    String? idDocumento =
+        restauranteId ?? FirebaseAuth.instance.currentUser?.uid;
+
+    if (idDocumento == null) return;
+
+    try {
+      final docRef = FirebaseFirestore.instance
+          .collection('restaurantes')
+          .doc(idDocumento);
+      final doc = await docRef.get();
+
+      if (doc.exists) {
+        List<dynamic> mesasFirebase = List.from(doc['mesas']);
+        mesasFirebase[index] = nuevoEstado;
+        await docRef.update({'mesas': mesasFirebase});
+      }
+    } catch (e) {
+      debugPrint("Error en Firebase: $e");
+    }
+  }
+
+  void ocuparMesa(int index) async {
+    mesaSeleccionada = index;
+    carrito.clear();
+    await actualizarMesaEnFirebase(index, 1);
+    notifyListeners();
+  }
+
   void agregarAlCarrito(Map<String, dynamic> plato) {
     carrito.add(plato);
     notifyListeners();
   }
 
-  //Funcion para calcular el valor total
   int get totalCarrito {
     int total = 0;
     for (var item in carrito) {
@@ -42,21 +55,13 @@ class AppState extends ChangeNotifier {
     return total;
   }
 
-  //Funcion para cambiar el estado de una mesa a ocupada
-  void ocuparMesa(int index) {
-    mesas[index] = 1;
-    mesaSeleccionada = index;
-    carrito.clear();
-    notifyListeners();
-  }
-
-  //Funcion para pagar
-  void pagar() {
+  void pagar() async {
     if (mesaSeleccionada != null) {
-      mesas[mesaSeleccionada!] = 2; //cambia el estado de la mesa a "limpiando"
+      int mesaCerrada = mesaSeleccionada!;
+      await actualizarMesaEnFirebase(mesaCerrada, 2);
 
       notificaciones.add({
-        'mesa': mesaSeleccionada! + 1,
+        'mesa': mesaCerrada + 1,
         'pedido': List<Map<String, dynamic>>.from(carrito),
         'timestamp': DateTime.now(),
       });
@@ -67,16 +72,13 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  //Funcion para borrar una notificacion
   void borrarNotificacion(int index) {
     notificaciones.removeAt(index);
     notifyListeners();
   }
 
-  //Funcion para habilitar mesa
-  void habilitarMesa(int index) {
-    mesas[index] = 0; //Cambia el estado de una mesa a "libre"
-    notifyListeners();
+  void habilitarMesa(int index) async {
+    await actualizarMesaEnFirebase(index, 0);
   }
 }
 
