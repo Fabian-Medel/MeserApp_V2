@@ -13,11 +13,24 @@ class _GestionMenuState extends State<GestionMenu> {
   final User? usuario = FirebaseAuth.instance.currentUser;
   final _nombreCtrl = TextEditingController();
   final _precioCtrl = TextEditingController();
+  final _descripcionCtrl = TextEditingController();
+  final _tiempoCtrl = TextEditingController();
+  final _urlImagenCtrl = TextEditingController();
   bool _subiendo = false;
 
-  void _abrirFormulario({String? id, String? nombre, int? precio}) {
+  void _abrirFormulario({
+    String? id,
+    String? nombre,
+    int? precio,
+    descripcion,
+    String? tiempo,
+    String? urlImagen,
+  }) {
     _nombreCtrl.text = nombre ?? '';
     _precioCtrl.text = precio?.toString() ?? '';
+    _descripcionCtrl.text = descripcion ?? '';
+    _tiempoCtrl.text = tiempo ?? '';
+    _urlImagenCtrl.text = urlImagen ?? '';
 
     showDialog(
       context: context,
@@ -39,6 +52,24 @@ class _GestionMenuState extends State<GestionMenu> {
                 controller: _precioCtrl,
                 decoration: const InputDecoration(labelText: 'Precio (\$)'),
                 keyboardType: TextInputType.number,
+              ),
+              TextField(
+                controller: _descripcionCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Descripción breve',
+                ),
+              ),
+              TextField(
+                controller: _tiempoCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Tiempo (ej: 30-45 min)',
+                ),
+              ),
+              TextField(
+                controller: _urlImagenCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'URL de la imagen (Referencial)',
+                ),
               ),
             ],
           ),
@@ -72,6 +103,9 @@ class _GestionMenuState extends State<GestionMenu> {
   Future<void> _guardarPlato(String? id) async {
     final String nombre = _nombreCtrl.text.trim();
     final int? precio = int.tryParse(_precioCtrl.text.trim());
+    final String descripcion = _descripcionCtrl.text.trim();
+    final String tiempo = _tiempoCtrl.text.trim();
+    final String urlImagen = _urlImagenCtrl.text.trim();
 
     if (nombre.isEmpty || precio == null || precio <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -88,12 +122,25 @@ class _GestionMenuState extends State<GestionMenu> {
           .collection('restaurantes')
           .doc(usuario!.uid)
           .collection('platos');
+      final Map<String, dynamic> datosPlato = {
+        'nombre': nombre,
+        'precio': precio,
+        'descripcion': descripcion,
+        'tiempo': tiempo,
+        'urlImagen': urlImagen,
+      };
 
       if (id == null) {
-        await ref.add({'nombre': nombre, 'precio': precio});
+        await ref.add(datosPlato);
       } else {
-        await ref.doc(id).update({'nombre': nombre, 'precio': precio});
+        await ref.doc(id).update(datosPlato);
       }
+
+      _nombreCtrl.clear();
+      _precioCtrl.clear();
+      _descripcionCtrl.clear();
+      _tiempoCtrl.clear();
+      _urlImagenCtrl.clear();
 
       if (mounted) Navigator.pop(context);
     } catch (e) {
@@ -117,6 +164,33 @@ class _GestionMenuState extends State<GestionMenu> {
         .delete();
   }
 
+  void _confirmacionBorrar(String id, String nombre) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Eliminar platillo?'),
+        content: Text('¿Estás seguro de que deseas eliminar "$nombre"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              _eliminarPlato(id);
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,12 +208,14 @@ class _GestionMenuState extends State<GestionMenu> {
             .collection('platos')
             .snapshots(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final docs = snapshot.data!.docs;
-          if (docs.isEmpty)
+          if (docs.isEmpty) {
             return const Center(child: Text('No hay platos registrados.'));
+          }
 
           return ListView.builder(
             itemCount: docs.length,
@@ -167,7 +243,8 @@ class _GestionMenuState extends State<GestionMenu> {
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _eliminarPlato(doc.id),
+                        onPressed: () =>
+                            _confirmacionBorrar(doc.id, data['nombre']),
                       ),
                     ],
                   ),

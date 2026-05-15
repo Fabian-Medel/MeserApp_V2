@@ -281,21 +281,57 @@ class _PerfilUsuarioState extends State<PerfilUsuario> {
                         minimumSize: const Size(double.infinity, 50),
                         side: const BorderSide(color: Colors.red),
                       ),
-                      onPressed: () async {
-                        await FirebaseAuth.instance.signOut();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Sesión cerrada correctamente'),
-                              backgroundColor: Colors.blueGrey,
-                            ),
-                          );
-                          Navigator.pushAndRemoveUntil(
-                            context,
-                            MaterialPageRoute(builder: (_) => const Inicio()),
-                            (route) => false,
-                          );
-                        }
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext dialogContext) {
+                            return AlertDialog(
+                              title: const Text('Confirmar salida'),
+                              content: const Text(
+                                '¿Estás seguro de que deseas cerrar sesión?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(dialogContext),
+                                  child: const Text('Cancelar'),
+                                ),
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                  ),
+                                  onPressed: () async {
+                                    Navigator.pop(dialogContext);
+
+                                    await FirebaseAuth.instance.signOut();
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'Sesión cerrada correctamente',
+                                          ),
+                                          backgroundColor: Colors.blueGrey,
+                                        ),
+                                      );
+                                      Navigator.pushAndRemoveUntil(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const Inicio(),
+                                        ),
+                                        (route) => false,
+                                      );
+                                    }
+                                  },
+                                  child: const Text(
+                                    'Cerrar Sesión',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
                       },
                     ),
                   ],
