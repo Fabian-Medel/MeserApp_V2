@@ -79,6 +79,9 @@ class AppState extends ChangeNotifier {
 
   void habilitarMesa(int index) async {
     await actualizarMesaEnFirebase(index, 0);
+
+    notificaciones.removeWhere((n) => n['mesa'] == (index + 1));
+    notifyListeners();
   }
 }
 

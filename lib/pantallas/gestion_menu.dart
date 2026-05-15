@@ -22,7 +22,7 @@ class _GestionMenuState extends State<GestionMenu> {
     String? id,
     String? nombre,
     int? precio,
-    descripcion,
+    String? descripcion,
     String? tiempo,
     String? urlImagen,
   }) {
@@ -68,7 +68,7 @@ class _GestionMenuState extends State<GestionMenu> {
               TextField(
                 controller: _urlImagenCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'URL de la imagen (Referencial)',
+                  labelText: 'URL de la imagen',
                 ),
               ),
             ],
@@ -235,11 +235,17 @@ class _GestionMenuState extends State<GestionMenu> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () => _abrirFormulario(
-                          id: doc.id,
-                          nombre: data['nombre'],
-                          precio: data['precio'],
-                        ),
+                        onPressed: () {
+                          final data = doc.data() as Map<String, dynamic>;
+                          _abrirFormulario(
+                            id: doc.id,
+                            nombre: data['nombre'],
+                            precio: data['precio'],
+                            descripcion: data['descripcion'] ?? '',
+                            tiempo: data['tiempo'] ?? '',
+                            urlImagen: data['urlImagen'] ?? '',
+                          );
+                        },
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),

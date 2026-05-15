@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../estado/app_state.dart';
+import 'lector_limpieza.dart';
 
 class Staff extends StatelessWidget {
   const Staff({super.key});
@@ -127,7 +128,6 @@ class Staff extends StatelessWidget {
                               trailing: ElevatedButton(
                                 onPressed: () {
                                   appState.habilitarMesa(notif['mesa'] - 1);
-                                  appState.borrarNotificacion(index);
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.indigo,
@@ -141,6 +141,20 @@ class Staff extends StatelessWidget {
                       ),
               ),
             ],
+          ),
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LectorLimpieza()),
+              );
+            },
+            label: const Text(
+              'Escanear Mesa',
+              style: TextStyle(color: Colors.white),
+            ),
+            icon: const Icon(Icons.qr_code_scanner, color: Colors.white),
+            backgroundColor: Colors.indigo,
           ),
         );
       },
