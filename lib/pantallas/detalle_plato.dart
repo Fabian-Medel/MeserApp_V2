@@ -86,24 +86,29 @@ class DetallePlato extends StatelessWidget {
           ),
         ],
       ),
-      bottomSheet: Container(
-        padding: const EdgeInsets.all(20),
-        child: ElevatedButton(
-          onPressed: () {
-            appState.agregarAlCarrito(plato);
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${plato['nombre']} añadido')),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.indigo,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 55),
-          ),
-          child: const Text('Añadir al pedido', style: TextStyle(fontSize: 18)),
-        ),
-      ),
+      bottomSheet: appState.mesaSeleccionada == null
+          ? null
+          : Container(
+              padding: const EdgeInsets.all(20),
+              child: ElevatedButton(
+                onPressed: () {
+                  appState.agregarAlCarrito(plato);
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('${plato['nombre']} añadido')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  foregroundColor: Colors.white,
+                  minimumSize: const Size(double.infinity, 55),
+                ),
+                child: const Text(
+                  'Añadir al pedido',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            ),
     );
   }
 }

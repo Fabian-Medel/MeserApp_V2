@@ -38,7 +38,7 @@ class Staff extends StatelessWidget {
                 child: StreamBuilder<DocumentSnapshot>(
                   stream: FirebaseFirestore.instance
                       .collection('restaurantes')
-                      .doc(uid)
+                      .doc(appState.restauranteId ?? uid)
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {

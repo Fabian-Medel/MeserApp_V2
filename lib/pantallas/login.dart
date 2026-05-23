@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'registro.dart';
 import 'contenedor_staff.dart';
+import 'configurar_local.dart';
 
 class Login extends StatefulWidget {
   const Login({super.key});
@@ -122,27 +123,72 @@ class LoginState extends State<Login> {
 
       final user = userCredential.user;
 
-      if (user != null && !user.emailVerified) {
-        await FirebaseAuth.instance.signOut();
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .get();
 
-        if (mounted) {
+        if (userDoc.exists) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final String rol = userData['rol'] ?? 'cliente';
+          final String restId = userData['restauranteId'] ?? user.uid;
+
+          if ((rol == 'jefe' || rol == 'cliente') && !user.emailVerified) {
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Debes verificar tu correo antes de entrar. Revisa tu bandeja de entrada.',
+                  ),
+                  backgroundColor: Colors.orange,
+                ),
+              );
+            }
+            setState(() {
+              _cargando = false;
+            });
+            return;
+          }
+
+          if (!mounted) return;
+
+          if (rol == 'mesero' || rol == 'chef') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ContenedorStaff()),
+            );
+          } else if (rol == 'jefe') {
+            final restDoc = await FirebaseFirestore.instance
+                .collection('restaurantes')
+                .doc(restId)
+                .get();
+            if (!mounted) return;
+
+            if (restDoc.exists && restDoc.data()?['configurado'] == true) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const ContenedorStaff()),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ConfigurarLocal(restauranteId: restId),
+                ),
+              );
+            }
+          }
+        } else {
+          if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                'Debes verificar tu correo antes de entrar. Revisa tu bandeja de entrada.',
-              ),
-              backgroundColor: Colors.orange,
+              content: Text('Usuario no registrado en la base de datos.'),
+              backgroundColor: Colors.red,
             ),
           );
         }
-        return;
-      }
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const ContenedorStaff()),
-        );
       }
     } on FirebaseAuthException catch (e) {
       String mensaje = 'Error al iniciar sesión';
@@ -151,10 +197,18 @@ class LoginState extends State<Login> {
           e.code == 'invalid-credential') {
         mensaje = 'Correo o contraseña incorrectos.';
       }
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(mensaje), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error inesperado: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -174,43 +228,84 @@ class LoginState extends State<Login> {
             '776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com',
       );
 
-      final GoogleSignInAccount usuarioGoogle = await GoogleSignIn.instance
+      final GoogleSignInAccount? usuarioGoogle = await GoogleSignIn.instance
           .authenticate();
 
-      final GoogleSignInAuthentication authGoogle =
-          usuarioGoogle.authentication;
+      if (usuarioGoogle != null) {
+        final GoogleSignInAuthentication authGoogle =
+            await usuarioGoogle.authentication;
 
-      final credential = GoogleAuthProvider.credential(
-        idToken: authGoogle.idToken,
-      );
-
-      final credencialFirebase = await FirebaseAuth.instance
-          .signInWithCredential(credential);
-      final usuario = credencialFirebase.user;
-
-      if (usuario != null) {
-        await FirebaseFirestore.instance
-            .collection('restaurantes')
-            .doc(usuario.uid)
-            .set({
-              'nombre': usuario.displayName ?? 'Restaurante nuevo',
-              'telefono': 'Sin configurar',
-              'direccion': 'Sin configurar',
-              'mesas': [0, 0, 0, 0, 0, 0],
-            }, SetOptions(merge: true));
-      }
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const ContenedorStaff()),
+        final credential = GoogleAuthProvider.credential(
+          idToken: authGoogle.idToken,
         );
+
+        final credencialFirebase = await FirebaseAuth.instance
+            .signInWithCredential(credential);
+        final usuario = credencialFirebase.user;
+
+        if (usuario != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(usuario.uid)
+              .get();
+
+          if (!userDoc.exists) {
+            await FirebaseFirestore.instance
+                .collection('usuarios')
+                .doc(usuario.uid)
+                .set({
+                  'uid': usuario.uid,
+                  'email': usuario.email ?? '',
+                  'rol': 'jefe',
+                  'estado': 'activo',
+                  'restauranteId': usuario.uid,
+                  'nombre': usuario.displayName ?? 'Sin configurar',
+                  'disponible': true,
+                  'tareaActualId': null,
+                });
+
+            await FirebaseFirestore.instance
+                .collection('restaurantes')
+                .doc(usuario.uid)
+                .set({'configurado': false});
+
+            if (!mounted) return;
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ConfigurarLocal(restauranteId: usuario.uid),
+              ),
+            );
+          } else {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final restId = userData['restauranteId'];
+            final restDoc = await FirebaseFirestore.instance
+                .collection('restaurantes')
+                .doc(restId)
+                .get();
+
+            if (!mounted) return;
+            if (restDoc.exists && restDoc.data()?['configurado'] == true) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (_) => const ContenedorStaff()),
+              );
+            } else {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ConfigurarLocal(restauranteId: restId),
+                ),
+              );
+            }
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Error al iniciar con Google'),
+            content: Text('Error al iniciar con Google o proceso cancelado'),
             backgroundColor: Colors.red,
           ),
         );
@@ -224,88 +319,92 @@ class LoginState extends State<Login> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Acceso Empleados')),
-      body: Padding(
-        padding: const EdgeInsets.all(25.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _passCtrl,
-              obscureText: _ocultarPassword,
-              decoration: InputDecoration(
-                labelText: 'Contraseña',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _ocultarPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _ocultarPassword = !_ocultarPassword;
-                    });
-                  },
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(25.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.restaurant_menu, size: 80, color: Colors.indigo),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _emailCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Correo electrónico',
+                  border: OutlineInputBorder(),
                 ),
+                keyboardType: TextInputType.emailAddress,
               ),
-            ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _mostrarDialogoRecuperarContrasena,
-                child: const Text(
-                  '¿Olvidaste tu contraseña?',
-                  style: TextStyle(
-                    color: Colors.indigo,
-                    fontWeight: FontWeight.bold,
+              const SizedBox(height: 20),
+              TextField(
+                controller: _passCtrl,
+                obscureText: _ocultarPassword,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _ocultarPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _ocultarPassword = !_ocultarPassword;
+                      });
+                    },
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-
-            _cargando
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: intentarLogin,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: Colors.indigo,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Text(
-                      'Iniciar Sesión',
-                      style: TextStyle(fontSize: 16),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _mostrarDialogoRecuperarContrasena,
+                  child: const Text(
+                    '¿Olvidaste tu contraseña?',
+                    style: TextStyle(
+                      color: Colors.indigo,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-
-            const Divider(height: 40),
-            OutlinedButton.icon(
-              label: const Text('Continuar con Google'),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 50),
-                foregroundColor: Colors.black,
+                ),
               ),
-              onPressed: iniciarConGoogle,
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const Registro()),
-                );
-              },
-              child: const Text('¿No tienes cuenta? Regístrate aquí'),
-            ),
-          ],
+              const SizedBox(height: 10),
+              _cargando
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: intentarLogin,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Colors.indigo,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Iniciar Sesión',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+              const Divider(height: 40),
+              OutlinedButton.icon(
+                label: const Text('Continuar con Google'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: iniciarConGoogle,
+              ),
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const Registro()),
+                  );
+                },
+                child: const Text('¿No tienes cuenta? Regístrate aquí'),
+              ),
+            ],
+          ),
         ),
       ),
     );

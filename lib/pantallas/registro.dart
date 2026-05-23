@@ -11,11 +11,10 @@ class Registro extends StatefulWidget {
 }
 
 class _PantallaRegistroState extends State<Registro> {
-  final _nombreRestCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  bool _ocultarPassword = true;
   final _confirmPassCtrl = TextEditingController();
+  bool _ocultarPassword = true;
   bool _cargando = false;
 
   void mostrarAlertaPersonalizada(String mensaje) {
@@ -80,9 +79,7 @@ class _PantallaRegistroState extends State<Registro> {
   }
 
   void registrarUsuario() async {
-    if (!validarCampos()) {
-      return;
-    }
+    if (!validarCampos()) return;
 
     setState(() => _cargando = true);
 
@@ -96,40 +93,44 @@ class _PantallaRegistroState extends State<Registro> {
       final usuario = credencial.user;
 
       if (usuario != null) {
-        String nombreFinal = _nombreRestCtrl.text.trim();
-        if (nombreFinal.isEmpty) nombreFinal = 'Restaurante nuevo';
-
-        await usuario.updateDisplayName(nombreFinal);
+        await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(usuario.uid)
+            .set({
+              'uid': usuario.uid,
+              'email': _emailCtrl.text.trim(),
+              'rol': 'jefe',
+              'estado': 'activo',
+              'restauranteId': usuario.uid,
+              'nombre': 'Sin configurar',
+              'disponible': false,
+              'tareaActualId': null,
+            });
 
         await FirebaseFirestore.instance
             .collection('restaurantes')
             .doc(usuario.uid)
-            .set({
-              'nombre': nombreFinal,
-              'telefono': 'Sin configurar',
-              'direccion': 'Sin configurar',
-              'mesas': [0, 0, 0, 0, 0, 0],
-            });
-      }
+            .set({'configurado': false});
 
-      if (usuario != null && !usuario.emailVerified) {
-        await usuario.sendEmailVerification();
-        await FirebaseAuth.instance.signOut();
+        if (!usuario.emailVerified) {
+          await usuario.sendEmailVerification();
+          await FirebaseAuth.instance.signOut();
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                '¡Registro exitoso! Te enviamos un enlace para verificar tu correo.',
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  '¡Registro exitoso! Te enviamos un enlace para verificar tu correo.',
+                ),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 5),
               ),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 5),
-            ),
-          );
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const Login()),
-          );
+            );
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const Login()),
+            );
+          }
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -146,81 +147,86 @@ class _PantallaRegistroState extends State<Registro> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear Cuenta Nueva')),
-      body: Padding(
-        padding: const EdgeInsets.all(25.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TextField(
-              controller: _nombreRestCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nombre del Restaurante',
-                border: OutlineInputBorder(),
+      appBar: AppBar(title: const Text('Crear Cuenta de Restaurante')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(25.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.store, size: 80, color: Colors.indigo),
+              const SizedBox(height: 20),
+              const Text(
+                'Registra tus datos',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico*',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _passCtrl,
-              obscureText: _ocultarPassword,
-              decoration: InputDecoration(
-                labelText: 'Contraseña*',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _ocultarPassword ? Icons.visibility_off : Icons.visibility,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _ocultarPassword = !_ocultarPassword;
-                    });
-                  },
+              const SizedBox(height: 30),
+              TextField(
+                controller: _emailCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Correo electrónico*',
+                  border: OutlineInputBorder(),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _confirmPassCtrl,
-              obscureText: _ocultarPassword,
-              decoration: InputDecoration(
-                labelText: 'Confirmar Contraseña*',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _ocultarPassword ? Icons.visibility_off : Icons.visibility,
+              const SizedBox(height: 20),
+              TextField(
+                controller: _passCtrl,
+                obscureText: _ocultarPassword,
+                decoration: InputDecoration(
+                  labelText: 'Contraseña*',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _ocultarPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _ocultarPassword = !_ocultarPassword;
+                      });
+                    },
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _ocultarPassword = !_ocultarPassword;
-                    });
-                  },
                 ),
               ),
-            ),
-            const SizedBox(height: 30),
-            _cargando
-                ? const CircularProgressIndicator()
-                : ElevatedButton(
-                    onPressed: registrarUsuario,
-                    style: ElevatedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 50),
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+              const SizedBox(height: 20),
+              TextField(
+                controller: _confirmPassCtrl,
+                obscureText: _ocultarPassword,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar Contraseña*',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _ocultarPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
                     ),
-                    child: const Text(
-                      'Registrarme',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    onPressed: () {
+                      setState(() {
+                        _ocultarPassword = !_ocultarPassword;
+                      });
+                    },
                   ),
-          ],
+                ),
+              ),
+              const SizedBox(height: 30),
+              _cargando
+                  ? const CircularProgressIndicator()
+                  : ElevatedButton(
+                      onPressed: registrarUsuario,
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text(
+                        'Registrarme',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );
