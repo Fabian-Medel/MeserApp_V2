@@ -3,32 +3,36 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'qr.dart';
 
 class Mesas extends StatelessWidget {
-  const Mesas({super.key});
+  final String restauranteId;
+  final String nombreRestaurante;
+
+  const Mesas({
+    super.key,
+    required this.restauranteId,
+    required this.nombreRestaurante,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Seleccionar Mesa')),
-      body: StreamBuilder<QuerySnapshot>(
+      appBar: AppBar(title: Text('Mesas - $nombreRestaurante')),
+      body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('restaurantes')
-            .limit(1)
+            .doc(restauranteId)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          if (!snapshot.hasData || !snapshot.data!.exists) {
             return const Center(
-              child: Text('No hay restaurantes disponibles.'),
+              child: Text('El restaurante seleccionado ya no está disponible.'),
             );
           }
 
-          final docRestaurante = snapshot.data!.docs.first;
-          final data = docRestaurante.data() as Map<String, dynamic>;
-          // Guardamos el ID del documento para pasarlo
-          final String restauranteId = docRestaurante.id;
+          final data = snapshot.data!.data() as Map<String, dynamic>;
 
           if (data['mesas'] == null) {
             return const Center(child: Text('Cargando mesas...'));

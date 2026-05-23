@@ -177,36 +177,34 @@ class LoginState extends State<Login> {
       final GoogleSignInAccount usuarioGoogle = await GoogleSignIn.instance
           .authenticate();
 
-      if (usuarioGoogle != null) {
-        final GoogleSignInAuthentication authGoogle =
-            usuarioGoogle.authentication;
+      final GoogleSignInAuthentication authGoogle =
+          usuarioGoogle.authentication;
 
-        final credential = GoogleAuthProvider.credential(
-          idToken: authGoogle.idToken,
+      final credential = GoogleAuthProvider.credential(
+        idToken: authGoogle.idToken,
+      );
+
+      final credencialFirebase = await FirebaseAuth.instance
+          .signInWithCredential(credential);
+      final usuario = credencialFirebase.user;
+
+      if (usuario != null) {
+        await FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(usuario.uid)
+            .set({
+              'nombre': usuario.displayName ?? 'Restaurante nuevo',
+              'telefono': 'Sin configurar',
+              'direccion': 'Sin configurar',
+              'mesas': [0, 0, 0, 0, 0, 0],
+            }, SetOptions(merge: true));
+      }
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const ContenedorStaff()),
         );
-
-        final credencialFirebase = await FirebaseAuth.instance
-            .signInWithCredential(credential);
-        final usuario = credencialFirebase.user;
-
-        if (usuario != null) {
-          await FirebaseFirestore.instance
-              .collection('restaurantes')
-              .doc(usuario.uid)
-              .set({
-                'nombre': usuario.displayName ?? 'Restaurante nuevo',
-                'telefono': 'Sin configurar',
-                'direccion': 'Sin configurar',
-                'mesas': [0, 0, 0, 0, 0, 0],
-              }, SetOptions(merge: true));
-        }
-
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const ContenedorStaff()),
-          );
-        }
       }
     } catch (e) {
       if (mounted) {

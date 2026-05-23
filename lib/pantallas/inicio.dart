@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'mesas.dart';
+import 'seleccion_restaurante.dart';
 import 'login.dart';
 import 'contenedor_staff.dart';
 
@@ -32,7 +32,9 @@ class Inicio extends StatelessWidget {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const Mesas()),
+                  MaterialPageRoute(
+                    builder: (_) => const SeleccionRestaurante(),
+                  ),
                 );
               },
             ),
