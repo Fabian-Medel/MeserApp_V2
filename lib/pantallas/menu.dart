@@ -167,7 +167,7 @@ class Menu extends StatelessWidget {
                                           ),
                                           const SizedBox(width: 5),
                                           Text(
-                                            item['tiempo'] ?? '20 min',
+                                            '${item['tiempo'] ?? '20'} minutos',
                                             style: const TextStyle(
                                               color: Colors.white70,
                                             ),

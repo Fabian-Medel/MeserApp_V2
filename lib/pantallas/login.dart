@@ -260,7 +260,7 @@ class LoginState extends State<Login> {
                   'estado': 'activo',
                   'restauranteId': usuario.uid,
                   'nombre': usuario.displayName ?? 'Sin configurar',
-                  'disponible': true,
+                  'disponible': false,
                   'tareaActualId': null,
                 });
 

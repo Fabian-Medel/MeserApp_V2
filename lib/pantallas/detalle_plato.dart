@@ -64,7 +64,7 @@ class DetallePlato extends StatelessWidget {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        plato['tiempo'] ?? '30 min',
+                        '${plato['tiempo'] ?? '20'} minutos',
                         style: const TextStyle(color: Colors.grey),
                       ),
                     ],
