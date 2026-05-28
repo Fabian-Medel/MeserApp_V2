@@ -8,6 +8,7 @@ import 'menu.dart';
 import 'perfil_usuario.dart';
 import 'perfil_empleado.dart';
 import 'gestion_empleados.dart';
+import 'vista_chef.dart';
 
 class ContenedorStaff extends StatefulWidget {
   const ContenedorStaff({super.key});
@@ -28,17 +29,14 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           .doc(_uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        if (snapshot.connectionState == ConnectionState.waiting)
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
-        }
-
-        if (!snapshot.hasData || !snapshot.data!.exists) {
+        if (!snapshot.hasData || !snapshot.data!.exists)
           return const Scaffold(
             body: Center(child: Text('Error al verificar permisos.')),
           );
-        }
 
         final userData = snapshot.data!.data() as Map<String, dynamic>;
         final String rol = userData['rol'] ?? 'mesero';
@@ -62,8 +60,8 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           ];
           barraItems = const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.table_restaurant),
-              label: 'Mesas',
+              icon: Icon(Icons.assignment),
+              label: 'Panel',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu),
@@ -76,7 +74,7 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           ];
         } else if (rol == 'chef') {
-          pantallas = [const Menu(), const PerfilEmpleado()];
+          pantallas = [const VistaChef(), const PerfilEmpleado()];
           barraItems = const [
             BottomNavigationBarItem(
               icon: Icon(Icons.soup_kitchen),
@@ -88,8 +86,8 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           pantallas = [const Staff(), const Menu(), const PerfilEmpleado()];
           barraItems = const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.table_restaurant),
-              label: 'Mesas',
+              icon: Icon(Icons.assignment),
+              label: 'Mis Tareas',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu),
@@ -99,9 +97,7 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           ];
         }
 
-        if (_indiceActual >= pantallas.length) {
-          _indiceActual = 0;
-        }
+        if (_indiceActual >= pantallas.length) _indiceActual = 0;
 
         return Scaffold(
           body: pantallas[_indiceActual],
@@ -110,11 +106,7 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
             selectedItemColor: Colors.indigo,
             unselectedItemColor: Colors.grey,
             type: BottomNavigationBarType.fixed,
-            onTap: (index) {
-              setState(() {
-                _indiceActual = index;
-              });
-            },
+            onTap: (index) => setState(() => _indiceActual = index),
             items: barraItems,
           ),
         );

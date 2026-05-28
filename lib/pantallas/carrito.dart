@@ -1,16 +1,25 @@
 import 'package:flutter/material.dart';
-
 import '../estado/app_state.dart';
+import 'vista_pedido_cliente.dart';
 
 class Carrito extends StatelessWidget {
   const Carrito({super.key});
 
-  void finalizarCompra(BuildContext context, String mensaje) {
-    appState.pagar();
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje), backgroundColor: Colors.green),
-    );
+  void confirmarPedido(BuildContext context) async {
+    await appState.enviarPedidoCocina();
+    if (context.mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const VistaPedidoCliente()),
+        (route) => route.isFirst,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pedido enviado a cocina.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 
   @override
@@ -69,34 +78,18 @@ class Carrito extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 ElevatedButton(
-                  onPressed: () => finalizarCompra(
-                    context,
-                    'Pago completo realizado con éxito.',
-                  ),
+                  onPressed: () => confirmarPedido(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                   ),
                   child: const Text(
-                    'Pagar Total',
+                    'Confirmar Pedido a Cocina',
                     style: TextStyle(fontSize: 18),
                   ),
                 ),
                 const SizedBox(height: 10),
-                OutlinedButton(
-                  onPressed: () => finalizarCompra(
-                    context,
-                    'Pago dividido realizado. (Mitad cancelada)',
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                  child: Text(
-                    'Dividir a medias (\$${appState.totalCarrito / 2} c/u)',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                ),
               ],
             ),
           ),

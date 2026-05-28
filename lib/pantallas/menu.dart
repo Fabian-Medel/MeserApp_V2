@@ -25,17 +25,7 @@ class Menu extends StatelessWidget {
         builder: (context, _) {
           if (appState.restauranteId == null) {
             return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.indigo),
-                  SizedBox(height: 15),
-                  Text(
-                    'Cargando la carta...',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
+              child: CircularProgressIndicator(color: Colors.indigo),
             );
           }
 
@@ -46,47 +36,26 @@ class Menu extends StatelessWidget {
                 .collection('platos')
                 .snapshots(),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                  child: CircularProgressIndicator(color: Colors.indigo),
-                );
-              }
-
-              if (snapshot.hasError || !snapshot.hasData) {
-                return const Center(child: Text('Error al cargar el menú.'));
-              }
-
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const Center(child: CircularProgressIndicator());
+              if (snapshot.hasError || !snapshot.hasData)
+                return const Center(child: Text('Error al cargar.'));
               final platos = snapshot.data!.docs;
-
-              if (platos.isEmpty) {
-                return const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Text(
-                      'Este restaurante aún no ha publicado su menú.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey, fontSize: 16),
-                    ),
-                  ),
-                );
-              }
+              if (platos.isEmpty)
+                return const Center(child: Text('Menú vacío.'));
 
               return ListView.builder(
-                padding: const EdgeInsets.only(bottom: 30),
+                padding: const EdgeInsets.only(bottom: 80),
                 itemCount: platos.length,
                 itemBuilder: (context, index) {
-                  final platoDoc = platos[index];
-                  final item = platoDoc.data() as Map<String, dynamic>;
-
+                  final item = platos[index].data() as Map<String, dynamic>;
                   return GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DetallePlato(plato: item),
-                        ),
-                      );
-                    },
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DetallePlato(plato: item),
+                      ),
+                    ),
                     child: Container(
                       margin: const EdgeInsets.symmetric(
                         horizontal: 15,
@@ -107,24 +76,12 @@ class Menu extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                         child: Stack(
                           children: [
-                            Hero(
-                              tag: item['nombre'],
-                              child: Image.network(
-                                item['urlImagen'] ??
-                                    'https://via.placeholder.com/400x200',
-                                width: double.infinity,
-                                height: double.infinity,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Container(
-                                      color: Colors.grey.shade300,
-                                      child: const Icon(
-                                        Icons.restaurant,
-                                        size: 50,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                              ),
+                            Image.network(
+                              item['urlImagen'] ??
+                                  'https://via.placeholder.com/400x200',
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
                             ),
                             Container(
                               decoration: BoxDecoration(
@@ -158,21 +115,11 @@ class Menu extends StatelessWidget {
                                     mainAxisAlignment:
                                         MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Row(
-                                        children: [
-                                          const Icon(
-                                            Icons.access_time,
-                                            color: Colors.white70,
-                                            size: 16,
-                                          ),
-                                          const SizedBox(width: 5),
-                                          Text(
-                                            '${item['tiempo'] ?? '20'} minutos',
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                            ),
-                                          ),
-                                        ],
+                                      Text(
+                                        '${item['tiempo'] ?? '20'} minutos',
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                        ),
                                       ),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
@@ -209,6 +156,22 @@ class Menu extends StatelessWidget {
           );
         },
       ),
+      floatingActionButton: appState.mesaSeleccionada != null
+          ? FloatingActionButton(
+              onPressed: () {
+                appState.solicitarAsistencia();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Un mesero va en camino...'),
+                    backgroundColor: Colors.indigo,
+                  ),
+                );
+              },
+              backgroundColor: Colors.indigo,
+              tooltip: 'Llamar Mesero',
+              child: const Icon(Icons.room_service, color: Colors.white),
+            )
+          : null,
       bottomNavigationBar: ListenableBuilder(
         listenable: appState,
         builder: (context, _) {
