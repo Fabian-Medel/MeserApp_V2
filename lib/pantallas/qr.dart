@@ -4,12 +4,12 @@ import '../estado/app_state.dart';
 import 'menu.dart';
 
 class LectorQR extends StatefulWidget {
-  final int indexMesa;
+  final int numeroMesa;
   final String idRestauranteDetectado;
 
   const LectorQR({
     super.key,
-    required this.indexMesa,
+    required this.numeroMesa,
     required this.idRestauranteDetectado,
   });
 
@@ -20,17 +20,27 @@ class LectorQR extends StatefulWidget {
 class _LectorQRState extends State<LectorQR> {
   bool yaDetectado = false;
 
-  void procesarEscaneoExitoso() {
-    if (!yaDetectado) {
-      yaDetectado = true;
+  void procesarEscaneoExitoso(String? codigoLeido) {
+    if (yaDetectado) return;
+
+    String esperado = '${widget.numeroMesa}|${widget.idRestauranteDetectado}';
+
+    if (codigoLeido == null || codigoLeido.trim() == esperado) {
+      setState(() => yaDetectado = true);
 
       appState.setRestauranteId(widget.idRestauranteDetectado);
-
-      appState.ocuparMesa(widget.indexMesa);
+      appState.ocuparMesa(widget.numeroMesa);
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const Menu()),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Código QR erróneo. No corresponde a esta mesa.'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -45,7 +55,15 @@ class _LectorQRState extends State<LectorQR> {
       ),
       body: Stack(
         children: [
-          MobileScanner(onDetect: (capture) => procesarEscaneoExitoso()),
+          MobileScanner(
+            onDetect: (capture) {
+              for (final barcode in capture.barcodes) {
+                if (barcode.rawValue != null) {
+                  procesarEscaneoExitoso(barcode.rawValue);
+                }
+              }
+            },
+          ),
           Center(
             child: Container(
               width: 250,
@@ -69,7 +87,7 @@ class _LectorQRState extends State<LectorQR> {
                   foregroundColor: Colors.white,
                   minimumSize: const Size(250, 55),
                 ),
-                onPressed: procesarEscaneoExitoso,
+                onPressed: () => procesarEscaneoExitoso(null),
               ),
             ),
           ),

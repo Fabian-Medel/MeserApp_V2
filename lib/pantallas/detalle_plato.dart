@@ -94,9 +94,6 @@ class DetallePlato extends StatelessWidget {
                 onPressed: () {
                   appState.agregarAlCarrito(plato);
                   Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('${plato['nombre']} añadido')),
-                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.indigo,

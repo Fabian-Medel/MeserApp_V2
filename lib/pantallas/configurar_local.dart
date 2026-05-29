@@ -53,13 +53,23 @@ class _ConfigurarLocalState extends State<ConfigurarLocal> {
             'direccion': direccion,
             'telefono': telefono,
             'configurado': true,
-            'mesas': [0, 0, 0, 0, 0, 0],
           }, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance
+          .collection('restaurantes')
+          .doc(widget.restauranteId)
+          .collection('mesas')
+          .doc('1')
+          .set({
+            'numero': 1,
+            'estado': 0, // 0 = Libre
+            'id': '1|${widget.restauranteId}',
+          });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('¡Local configurado con éxito!'),
+            content: Text('¡Local configurado con éxito! Mesa 1 habilitada.'),
             backgroundColor: Colors.green,
           ),
         );

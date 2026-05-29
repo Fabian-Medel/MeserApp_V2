@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../estado/app_state.dart';
 import 'lector_limpieza.dart';
 
@@ -53,13 +54,14 @@ class _StaffState extends State<Staff> {
         });
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Tarea ya asignada a otro.'),
             backgroundColor: Colors.orange,
           ),
         );
+      }
     } finally {
       if (mounted) setState(() => _procesando = false);
     }
@@ -70,7 +72,7 @@ class _StaffState extends State<Staff> {
     String coleccion,
     String tipo,
     String restauranteId,
-    int? mesaIndex,
+    int? numeroMesa,
   ) async {
     setState(() => _procesando = true);
 
@@ -92,10 +94,25 @@ class _StaffState extends State<Staff> {
       'coleccionOrigen': FieldValue.delete(),
       'tipoTarea': FieldValue.delete(),
     });
+
+    if (tipo == 'pago_efectivo' && numeroMesa != null) {
+      final pedidosCobrar = await FirebaseFirestore.instance
+          .collection('restaurantes')
+          .doc(restauranteId)
+          .collection('pedidos')
+          .where('mesa', isEqualTo: numeroMesa)
+          .where('estado', isEqualTo: 'esperando_pago')
+          .get();
+
+      for (var docPedido in pedidosCobrar.docs) {
+        batch.update(docPedido.reference, {'estado': 'pendiente'});
+      }
+    }
+
     await batch.commit();
 
-    if (tipo == 'limpieza' && mesaIndex != null) {
-      appState.habilitarMesa(mesaIndex);
+    if (tipo == 'limpieza' && numeroMesa != null) {
+      appState.habilitarMesa(numeroMesa);
     }
 
     if (mounted) setState(() => _procesando = false);
@@ -120,14 +137,16 @@ class _StaffState extends State<Staff> {
                 .doc(uid)
                 .snapshots(),
             builder: (context, userSnap) {
-              if (!userSnap.hasData)
+              if (!userSnap.hasData) {
                 return const Center(child: CircularProgressIndicator());
+              }
 
               final userData = userSnap.data!.data() as Map<String, dynamic>;
               final String? tareaActualId = userData['tareaActualId'];
               final String? coleccionOrigen = userData['coleccionOrigen'];
               final String? tipoTarea = userData['tipoTarea'];
               final String restId = userData['restauranteId'] ?? uid;
+              final bool disponible = userData['disponible'] ?? false;
 
               return CustomScrollView(
                 slivers: [
@@ -146,43 +165,92 @@ class _StaffState extends State<Staff> {
                   SliverToBoxAdapter(
                     child: SizedBox(
                       height: 90,
-                      child: StreamBuilder<DocumentSnapshot>(
+                      child: StreamBuilder<QuerySnapshot>(
                         stream: FirebaseFirestore.instance
                             .collection('restaurantes')
                             .doc(restId)
+                            .collection('mesas')
+                            .orderBy('numero')
                             .snapshots(),
                         builder: (context, snapshot) {
-                          if (!snapshot.hasData || !snapshot.data!.exists)
+                          if (!snapshot.hasData) {
                             return const Center(
                               child: CircularProgressIndicator(),
                             );
-                          List<dynamic> mesas = snapshot.data!['mesas'];
+                          }
+                          final docsMesas = snapshot.data!.docs;
                           return ListView.builder(
                             scrollDirection: Axis.horizontal,
                             padding: const EdgeInsets.symmetric(horizontal: 10),
-                            itemCount: mesas.length,
+                            itemCount: docsMesas.length,
                             itemBuilder: (context, index) {
-                              int estado = mesas[index];
-                              return Container(
-                                width: 80,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: estado == 0
-                                      ? Colors.green.shade400
-                                      : (estado == 1
-                                            ? Colors.red.shade400
-                                            : Colors.orange.shade400),
-                                  borderRadius: BorderRadius.circular(15),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${index + 1}',
-                                    style: const TextStyle(
-                                      fontSize: 28,
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                              final mesaData =
+                                  docsMesas[index].data()
+                                      as Map<String, dynamic>;
+                              int numero = mesaData['numero'];
+                              int estado = mesaData['estado'] ?? 0;
+                              String qrData =
+                                  mesaData['id'] ?? '$numero|$restId';
+
+                              return GestureDetector(
+                                onTap: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      title: Text('Mesa $numero'),
+                                      content: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 150,
+                                            height: 150,
+                                            child: QrImageView(
+                                              data: qrData,
+                                              version: QrVersions.auto,
+                                              size: 150.0,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                          Text(
+                                            'Código de enlace: $qrData',
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('Cerrar'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 80,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: estado == 0
+                                        ? Colors.green.shade400
+                                        : (estado == 1
+                                              ? Colors.red.shade400
+                                              : Colors.orange.shade400),
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      '$numero',
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -196,7 +264,6 @@ class _StaffState extends State<Staff> {
                   const SliverToBoxAdapter(
                     child: Divider(height: 30, thickness: 2),
                   ),
-
                   if (tareaActualId != null && coleccionOrigen != null)
                     SliverToBoxAdapter(
                       child: _construirTareaActual(
@@ -207,7 +274,7 @@ class _StaffState extends State<Staff> {
                       ),
                     )
                   else
-                    _construirListasDisponibles(restId),
+                    _construirListasDisponibles(restId, disponible),
                 ],
               );
             },
@@ -243,11 +310,13 @@ class _StaffState extends State<Staff> {
           .doc(tareaId)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data!.data() as Map<String, dynamic>?;
-        if (data == null)
+        if (data == null) {
           return const Center(child: Text('La tarea fue cancelada.'));
+        }
 
         String titulo = coleccion == 'pedidos'
             ? 'ENTREGAR COMIDA\n(Mesa ${data['mesa']})'
@@ -307,7 +376,7 @@ class _StaffState extends State<Staff> {
                             coleccion,
                             tipo ?? 'pedido',
                             restId,
-                            data['mesa'] - 1,
+                            data['mesa'],
                           ),
                         ),
                 ],
@@ -319,7 +388,7 @@ class _StaffState extends State<Staff> {
     );
   }
 
-  Widget _construirListasDisponibles(String restId) {
+  Widget _construirListasDisponibles(String restId, bool disponible) {
     return SliverToBoxAdapter(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,19 +404,17 @@ class _StaffState extends State<Staff> {
               ),
             ),
           ),
-
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('restaurantes')
                 .doc(restId)
                 .collection('pedidos')
                 .where('estado', isEqualTo: 'listo')
+                .where('meseroAsignadoId', isNull: true)
                 .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox.shrink();
-              final tareas = snapshot.data!.docs
-                  .where((d) => (d.data() as Map)['meseroAsignadoId'] == null)
-                  .toList();
+              final tareas = snapshot.data!.docs;
 
               return Column(
                 children: tareas.map((doc) {
@@ -370,13 +437,23 @@ class _StaffState extends State<Staff> {
                       trailing: _procesando
                           ? const CircularProgressIndicator()
                           : ElevatedButton(
-                              onPressed: () => _tomarTarea(
-                                doc.id,
-                                'pedidos',
-                                'pedido',
-                                restId,
+                              onPressed: disponible
+                                  ? () => _tomarTarea(
+                                      doc.id,
+                                      'pedidos',
+                                      'pedido',
+                                      restId,
+                                    )
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: disponible
+                                    ? Colors.indigo
+                                    : Colors.grey,
+                                foregroundColor: Colors.white,
                               ),
-                              child: const Text('Tomar'),
+                              child: Text(
+                                disponible ? 'Tomar' : 'No disponible',
+                              ),
                             ),
                     ),
                   );
@@ -384,19 +461,17 @@ class _StaffState extends State<Staff> {
               );
             },
           ),
-
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance
                 .collection('restaurantes')
                 .doc(restId)
                 .collection('notificaciones')
                 .where('estado', isEqualTo: 'pendiente')
+                .where('meseroAsignadoId', isNull: true)
                 .snapshots(),
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const SizedBox.shrink();
-              final tareas = snapshot.data!.docs
-                  .where((d) => (d.data() as Map)['meseroAsignadoId'] == null)
-                  .toList();
+              final tareas = snapshot.data!.docs;
 
               return Column(
                 children: tareas.map((doc) {
@@ -422,13 +497,23 @@ class _StaffState extends State<Staff> {
                       trailing: _procesando
                           ? const CircularProgressIndicator()
                           : ElevatedButton(
-                              onPressed: () => _tomarTarea(
-                                doc.id,
-                                'notificaciones',
-                                tipo,
-                                restId,
+                              onPressed: disponible
+                                  ? () => _tomarTarea(
+                                      doc.id,
+                                      'notificaciones',
+                                      tipo,
+                                      restId,
+                                    )
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: disponible
+                                    ? Colors.indigo
+                                    : Colors.grey,
+                                foregroundColor: Colors.white,
                               ),
-                              child: const Text('Tomar'),
+                              child: Text(
+                                disponible ? 'Tomar' : 'No disponible',
+                              ),
                             ),
                     ),
                   );

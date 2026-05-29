@@ -16,29 +16,25 @@ class Mesas extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Mesas - $nombreRestaurante')),
-      body: StreamBuilder<DocumentSnapshot>(
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('restaurantes')
             .doc(restauranteId)
+            .collection('mesas')
+            .orderBy('numero')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (!snapshot.hasData || !snapshot.data!.exists) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
             return const Center(
-              child: Text('El restaurante seleccionado ya no está disponible.'),
+              child: Text('Cargando mesas o local sin mesas configuradas.'),
             );
           }
 
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-
-          if (data['mesas'] == null) {
-            return const Center(child: Text('Cargando mesas...'));
-          }
-
-          List<dynamic> mesasFirebase = data['mesas'];
+          final docs = snapshot.data!.docs;
 
           return GridView.builder(
             padding: const EdgeInsets.all(15),
@@ -47,9 +43,12 @@ class Mesas extends StatelessWidget {
               crossAxisSpacing: 15,
               mainAxisSpacing: 15,
             ),
-            itemCount: mesasFirebase.length,
+            itemCount: docs.length,
             itemBuilder: (context, index) {
-              int estado = mesasFirebase[index];
+              final mesa = docs[index].data() as Map<String, dynamic>;
+              int numeroMesa = mesa['numero'];
+              int estado = mesa['estado'] ?? 0;
+
               Color colorMesa = estado == 0
                   ? Colors.green
                   : (estado == 1 ? Colors.red : Colors.orange);
@@ -64,7 +63,7 @@ class Mesas extends StatelessWidget {
                           context,
                           MaterialPageRoute(
                             builder: (_) => LectorQR(
-                              indexMesa: index,
+                              numeroMesa: numeroMesa,
                               idRestauranteDetectado: restauranteId,
                             ),
                           ),
@@ -77,7 +76,7 @@ class Mesas extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Mesa ${index + 1}',
+                        'Mesa $numeroMesa',
                         style: const TextStyle(
                           fontSize: 24,
                           color: Colors.white,
@@ -88,8 +87,8 @@ class Mesas extends StatelessWidget {
                         estado == 0
                             ? Icons.check_circle
                             : (estado == 1
-                                  ? Icons.cancel
-                                  : Icons.cleaning_services),
+                                ? Icons.cancel
+                                : Icons.cleaning_services),
                         color: Colors.white,
                         size: 40,
                       ),

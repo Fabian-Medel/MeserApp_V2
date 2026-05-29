@@ -30,10 +30,9 @@ class VistaChef extends StatelessWidget {
                 .doc(appState.restauranteId)
                 .collection('pedidos')
                 .where('estado', isEqualTo: 'pendiente')
-                // ❌ ELIMINAMOS el .orderBy('timestamp') de Firebase para evitar el error de Índice
+                .orderBy('timestamp', descending: false)
                 .snapshots(),
             builder: (context, snapshot) {
-              // 1. Manejo de Errores reales
               if (snapshot.hasError) {
                 return Center(
                   child: Text(
@@ -65,19 +64,7 @@ class VistaChef extends StatelessWidget {
                 );
               }
 
-              // 2. Ordenamos los pedidos LOCALMENTE con Dart (¡Soluciona el bug!)
-              final pedidos = snapshot.data!.docs.toList();
-              pedidos.sort((a, b) {
-                final dataA = a.data() as Map<String, dynamic>;
-                final dataB = b.data() as Map<String, dynamic>;
-
-                final tA = dataA['timestamp'] as Timestamp?;
-                final tB = dataB['timestamp'] as Timestamp?;
-
-                if (tA == null || tB == null)
-                  return 0; // Protegemos contra la latencia de red
-                return tA.compareTo(tB); // Orden Cronológico
-              });
+              final pedidos = snapshot.data!.docs;
 
               return ListView.builder(
                 itemCount: pedidos.length,
@@ -124,8 +111,6 @@ class VistaChef extends StatelessWidget {
                             ],
                           ),
                           const Divider(thickness: 1.5),
-
-                          // Mostramos la lista de platos
                           ...items.map(
                             (item) => Padding(
                               padding: const EdgeInsets.symmetric(
@@ -141,8 +126,11 @@ class VistaChef extends StatelessWidget {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      '${item['nombre']}',
-                                      style: const TextStyle(fontSize: 18),
+                                      '${item['cantidad']}x ${item['nombre']}',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -150,7 +138,6 @@ class VistaChef extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 15),
-
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton.icon(

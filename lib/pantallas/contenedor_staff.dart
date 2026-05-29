@@ -9,6 +9,8 @@ import 'perfil_usuario.dart';
 import 'perfil_empleado.dart';
 import 'gestion_empleados.dart';
 import 'vista_chef.dart';
+import 'dashboard.dart';
+import 'gestion_mesas.dart';
 
 class ContenedorStaff extends StatefulWidget {
   const ContenedorStaff({super.key});
@@ -53,15 +55,16 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
 
         if (rol == 'jefe') {
           pantallas = [
-            const Staff(),
+            const DashboardAdministrativo(),
             const GestionMenu(),
             const GestionEmpleados(),
+            const GestionMesas(),
             const PerfilUsuario(),
           ];
           barraItems = const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.assignment),
-              label: 'Panel',
+              icon: Icon(Icons.analytics),
+              label: 'Dashboard',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu),
@@ -71,14 +74,22 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
               icon: Icon(Icons.people),
               label: 'Personal',
             ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.table_bar),
+              label: 'Mesas',
+            ),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           ];
         } else if (rol == 'chef') {
-          pantallas = [const VistaChef(), const PerfilEmpleado()];
+          pantallas = [const VistaChef(), const Menu(), const PerfilEmpleado()];
           barraItems = const [
             BottomNavigationBarItem(
               icon: Icon(Icons.soup_kitchen),
               label: 'Cocina',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.restaurant_menu),
+              label: 'Menú',
             ),
             BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Perfil'),
           ];
@@ -87,7 +98,7 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           barraItems = const [
             BottomNavigationBarItem(
               icon: Icon(Icons.assignment),
-              label: 'Mis Tareas',
+              label: 'Panel de Tareas',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu),
