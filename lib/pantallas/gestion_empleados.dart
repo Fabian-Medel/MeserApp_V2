@@ -185,7 +185,7 @@ class _GestionEmpleadosState extends State<GestionEmpleados> {
                 ],
                 const SizedBox(height: 15),
                 DropdownButtonFormField<String>(
-                  value: _rolSeleccionado,
+                  initialValue: _rolSeleccionado,
                   items: const [
                     DropdownMenuItem(value: 'mesero', child: Text('Mesero')),
                     DropdownMenuItem(value: 'chef', child: Text('Chef')),

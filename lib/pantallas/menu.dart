@@ -215,13 +215,16 @@ class _MenuState extends State<Menu> {
                   .collection('platos')
                   .snapshots(),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
-                if (snapshot.hasError || !snapshot.hasData)
+                }
+                if (snapshot.hasError || !snapshot.hasData) {
                   return const Center(child: Text('Error al cargar.'));
+                }
                 final platos = snapshot.data!.docs;
-                if (platos.isEmpty)
+                if (platos.isEmpty) {
                   return const Center(child: Text('Menú vacío.'));
+                }
 
                 return ListView.builder(
                   padding: const EdgeInsets.only(bottom: 80),
@@ -422,8 +425,9 @@ class _MenuState extends State<Menu> {
         bottomNavigationBar: ListenableBuilder(
           listenable: appState,
           builder: (context, _) {
-            if (appState.carrito.isEmpty || appState.mesaSeleccionada == null)
+            if (appState.carrito.isEmpty || appState.mesaSeleccionada == null) {
               return const SizedBox.shrink();
+            }
             return BottomAppBar(
               child: ElevatedButton(
                 onPressed: () => Navigator.push(

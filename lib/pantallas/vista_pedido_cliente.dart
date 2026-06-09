@@ -119,8 +119,9 @@ class VistaPedidoCliente extends StatelessWidget {
                     .orderBy('timestamp', descending: false)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData)
+                  if (!snapshot.hasData) {
                     return const Center(child: CircularProgressIndicator());
+                  }
 
                   final pedidosActivos = snapshot.data!.docs.where((doc) {
                     return (doc.data() as Map<String, dynamic>)['estado'] !=
@@ -156,13 +157,16 @@ class VistaPedidoCliente extends StatelessWidget {
                                 .toString()
                                 .toUpperCase();
                             Color colorEstado = Colors.grey;
-                            if (estado == 'ESPERANDO_PAGO')
+                            if (estado == 'ESPERANDO_PAGO') {
                               colorEstado = Colors.redAccent;
-                            if (estado == 'PREPARANDO' || estado == 'PENDIENTE')
+                            }
+                            if (estado == 'PREPARANDO' || estado == 'PENDIENTE') {
                               colorEstado = Colors.orange;
+                            }
                             if (estado == 'LISTO') colorEstado = Colors.blue;
-                            if (estado == 'ENTREGADO')
+                            if (estado == 'ENTREGADO') {
                               colorEstado = Colors.green;
+                            }
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 15),

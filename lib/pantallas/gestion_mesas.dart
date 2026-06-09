@@ -48,7 +48,7 @@ class _GestionMesasState extends State<GestionMesas> {
                   .set({
                     'numero': nuevoNumero,
                     'estado': 0,
-                    'id': '${nuevoNumero}|$uid' 
+                    'id': '$nuevoNumero|$uid' 
                   });
             },
             child: const Text('Confirmar', style: TextStyle(color: Colors.white)),

@@ -31,14 +31,16 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           .doc(_uid)
           .snapshots(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
-        if (!snapshot.hasData || !snapshot.data!.exists)
+        }
+        if (!snapshot.hasData || !snapshot.data!.exists) {
           return const Scaffold(
             body: Center(child: Text('Error al verificar permisos.')),
           );
+        }
 
         final userData = snapshot.data!.data() as Map<String, dynamic>;
         final String rol = userData['rol'] ?? 'mesero';

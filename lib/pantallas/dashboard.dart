@@ -37,16 +37,19 @@ class _DashboardAdministrativoState extends State<DashboardAdministrativo> {
             .orderBy('timestamp', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
-          if (snapshot.hasError)
+          if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
-          if (snapshot.connectionState == ConnectionState.waiting)
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
+          }
 
           final pedidos = snapshot.data!.docs;
-          if (pedidos.isEmpty)
+          if (pedidos.isEmpty) {
             return const Center(
               child: Text('No hay datos en los últimos 30 días.'),
             );
+          }
 
           int totalIngresos = 0;
           Map<String, int> ventasPorPlato = {};
@@ -312,8 +315,9 @@ class _DashboardAdministrativoState extends State<DashboardAdministrativo> {
                                       sideTitles: SideTitles(
                                         showTitles: true,
                                         getTitlesWidget: (value, meta) {
-                                          if (value.toInt() >= top5.length)
+                                          if (value.toInt() >= top5.length) {
                                             return const Text('');
+                                          }
                                           String nombre =
                                               top5[value.toInt()].key;
                                           return Padding(

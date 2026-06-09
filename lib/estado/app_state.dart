@@ -1,16 +1,81 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AppState extends ChangeNotifier {
   String? restauranteId;
   int? mesaSeleccionada;
   List<Map<String, dynamic>> carrito = [];
 
+  bool estaOffline = false;
+  late Box _colaSyncBox;
+  late Box _pedidosBox;
+
+  AppState() {
+    _colaSyncBox = Hive.box('cola_sync');
+    _pedidosBox = Hive.box('pedidos');
+    _escucharConexion();
+  }
+  void _escucharConexion() {
+    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) async {
+      estaOffline = result == ConnectivityResult.none;
+      notifyListeners();
+
+      if (!estaOffline) {
+        await _sincronizarCola();
+      }
+    });
+  }
+
+  Future<void> _guardarEnCola(String tipo, Map<String, dynamic> datos) async {
+      final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+      cola.add({'tipo': tipo, 'datos': datos, 'timestamp': DateTime.now().toIso8601String()});
+      await _colaSyncBox.put('operaciones', cola);
+    }
+
+    Future<void> _sincronizarCola() async {
+      final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+      if (cola.isEmpty) return;
+
+      for (final operacion in List.from(cola)) {
+        try {
+          await _ejecutarOperacion(operacion);
+          cola.remove(operacion);
+          await _colaSyncBox.put('operaciones', cola);
+        } catch (e) {
+          debugPrint("Fallo al sincronizar operación, se mantiene en cola: $e");
+          break;
+        }
+      }
+    }
+
+  Future<void> _ejecutarOperacion(Map operacion) async {
+      switch (operacion['tipo']) {
+        case 'crear_pedido':
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(operacion['datos']['restauranteId'])
+              .collection('pedidos')
+              .doc(operacion['datos']['idLocal'])
+              .set(operacion['datos']);
+          break;
+        case 'crear_notificacion':
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(operacion['datos']['restauranteId'])
+              .collection('notificaciones')
+              .add(operacion['datos']);
+          break;
+      }
+    }
+
   void setRestauranteId(String id) {
     restauranteId = id;
     notifyListeners();
   }
+
 
   Future<void> actualizarMesaEnFirebase(int numeroMesa, int nuevoEstado) async {
     String? idDocumento =
@@ -81,7 +146,6 @@ class AppState extends ChangeNotifier {
     return total;
   }
 
-  // --- NUEVO: PAGO CON TARJETA (Directo a cocina) ---
   Future<bool> enviarPedidoTarjeta() async {
     if (mesaSeleccionada != null && restauranteId != null) {
       final carritoAgrupado = <String, Map<String, dynamic>>{};
@@ -97,29 +161,42 @@ class AppState extends ChangeNotifier {
         }
       }
       final listaFinal = carritoAgrupado.values.toList();
+      final String localId = DateTime.now().millisecondsSinceEpoch.toString();
+      
+      final pedidoData = {
+        'idLocal': localId,
+        'restauranteId': restauranteId,
+        'mesa': mesaSeleccionada!,
+        'pedido': listaFinal,
+        'total': totalCarrito,
+        'estado': 'pendiente',
+        'metodoPago': 'tarjeta',
+        'meseroAsignadoId': null,
+        'timestamp': DateTime.now(),
+      };
 
-      try {
-        await FirebaseFirestore.instance
-            .collection('restaurantes')
-            .doc(restauranteId)
-            .collection('pedidos')
-            .add({
-              'mesa': mesaSeleccionada!,
-              'pedido': listaFinal,
-              'total': totalCarrito,
-              'estado': 'pendiente', // Va directo al chef
-              'metodoPago': 'tarjeta',
-              'meseroAsignadoId': null,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
+      await _pedidosBox.put(localId, pedidoData);
+      carrito.clear();
+      notifyListeners();      
+      
+      if (!estaOffline) {
+        try {
+          pedidoData['timestamp'] = FieldValue.serverTimestamp();
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(restauranteId)
+              .collection('pedidos')
+              .doc(localId)
+              .set(pedidoData);
+          await _pedidosBox.delete(localId);
+        } catch (e) {
+          await _guardarEnCola('crear_pedido', pedidoData);
+        }
 
-        carrito.clear();
-        notifyListeners();
-        return true;
-      } catch (e) {
-        debugPrint("Error al enviar pedido con tarjeta: $e");
-        return false;
+      } else {
+        await _guardarEnCola('crear_pedido', pedidoData);
       }
+      return true;         
     }
     return false;
   }
@@ -139,41 +216,63 @@ class AppState extends ChangeNotifier {
         }
       }
       final listaFinal = carritoAgrupado.values.toList();
+      final String localId = DateTime.now().millisecondsSinceEpoch.toString();
+      final String notifId = 'notif_$localId';
 
-      try {
-        await FirebaseFirestore.instance
-            .collection('restaurantes')
-            .doc(restauranteId)
-            .collection('pedidos')
-            .add({
-              'mesa': mesaSeleccionada!,
-              'pedido': listaFinal,
-              'total': totalCarrito,
-              'estado': 'esperando_pago',
-              'metodoPago': 'efectivo',
-              'meseroAsignadoId': null,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
+      final pedidoData = {
+        'idLocal': localId,
+        'restauranteId': restauranteId,
+        'mesa': mesaSeleccionada!,
+        'pedido': listaFinal,
+        'total': totalCarrito,
+        'estado': 'esperando_pago',
+        'metodoPago': 'efectivo',
+        'meseroAsignadoId': null,
+        'timestamp': DateTime.now(),
+      };
 
-        final docRef = await FirebaseFirestore.instance
-            .collection('restaurantes')
-            .doc(restauranteId)
-            .collection('notificaciones')
-            .add({
-              'tipo': 'pago_efectivo',
-              'mesa': mesaSeleccionada!,
-              'estado': 'pendiente',
-              'meseroAsignadoId': null,
-              'timestamp': FieldValue.serverTimestamp(),
-            });
+      final notifData = {
+        'restauranteId': restauranteId,
+        'tipo': 'pago_efectivo',
+        'mesa': mesaSeleccionada!,
+        'estado': 'pendiente',
+        'meseroAsignadoId': null,
+        'timestamp': DateTime.now(),
+      };
 
-        carrito.clear();
-        notifyListeners();
-        return docRef.id;
-      } catch (e) {
-        debugPrint("Error al generar pago en efectivo: $e");
-        return null;
+      await _pedidosBox.put(localId, pedidoData);
+      carrito.clear();
+      notifyListeners();
+
+      if (!estaOffline) {
+        try {
+          pedidoData['timestamp'] = FieldValue.serverTimestamp();
+          notifData['timestamp'] = FieldValue.serverTimestamp();
+          
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(restauranteId)
+              .collection('pedidos')
+              .doc(localId)
+              .set(pedidoData);
+              
+          final docRef = await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(restauranteId)
+              .collection('notificaciones')
+              .add(notifData);
+              
+          await _pedidosBox.delete(localId);
+          return docRef.id; // Retorna ID real para escuchar en la pantalla de EsperaPago
+        } catch (e) {
+          await _guardarEnCola('crear_pedido', pedidoData);
+          await _guardarEnCola('crear_notificacion', notifData);
+        }
+      } else {
+        await _guardarEnCola('crear_pedido', pedidoData);
+        await _guardarEnCola('crear_notificacion', notifData);
       }
+      return notifId; // Retorna ID temporal local para la UI
     }
     return null;
   }
@@ -266,7 +365,7 @@ class AppState extends ChangeNotifier {
     debugPrint("idDocumento final: $idDocumento");
 
     if (idDocumento == null) {
-      debugPrint("❌ FALLO: idDocumento es null");
+      debugPrint(" FALLO: idDocumento es null");
       return false;
     }
 
@@ -284,12 +383,12 @@ class AppState extends ChangeNotifier {
       );
 
       if (pedidosPendientes.docs.isNotEmpty) {
-        debugPrint("❌ FALLO: hay pedidos activos bloqueando la mesa");
+        debugPrint(" FALLO: hay pedidos activos bloqueando la mesa");
         return false;
       }
 
       await actualizarMesaEnFirebase(numeroMesa, 0);
-      debugPrint("✅ Mesa $numeroMesa actualizada a estado 0");
+      debugPrint(" Mesa $numeroMesa actualizada a estado 0");
 
       final batch = FirebaseFirestore.instance.batch();
 

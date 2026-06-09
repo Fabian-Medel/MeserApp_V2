@@ -228,12 +228,12 @@ class LoginState extends State<Login> {
             '776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com',
       );
 
-      final GoogleSignInAccount? usuarioGoogle = await GoogleSignIn.instance
+      final GoogleSignInAccount usuarioGoogle = await GoogleSignIn.instance
           .authenticate();
 
       if (usuarioGoogle != null) {
         final GoogleSignInAuthentication authGoogle =
-            await usuarioGoogle.authentication;
+            usuarioGoogle.authentication;
 
         final credential = GoogleAuthProvider.credential(
           idToken: authGoogle.idToken,
