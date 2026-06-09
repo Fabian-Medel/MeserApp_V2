@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "776509224127",
+    "project_id": "mi-restaurante-app-bdfbe",
+    "storage_bucket": "mi-restaurante-app-bdfbe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776509224127:android:8e1761ce1994baaff6420a",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "776509224127-a9scir25mccfg920kcsn8933a2i2qogo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.flutter_application_1",
+            "certificate_hash": "8dd5fba576c65f1021d082f5a42e242675536c4e"
+          }
+        },
+        {
+          "client_id": "776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb3-pB5jj-44CdqcUHts9iMKDt5fs6cQQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "776509224127-fb8vtplbmc9k65cpi9j5rnmsival2vnh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.meserapp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776509224127:android:b2d0480440633620f6420a",
+        "android_client_info": {
+          "package_name": "com.example.meserapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "776509224127-k5o2p79fcgg17l4gi1l48ps0ole6b3pl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.meserapp",
+            "certificate_hash": "8dd5fba576c65f1021d082f5a42e242675536c4e"
+          }
+        },
+        {
+          "client_id": "776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb3-pB5jj-44CdqcUHts9iMKDt5fs6cQQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "776509224127-peb5aa78l6bok521q3l8f29csiiv94b5.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "776509224127-fb8vtplbmc9k65cpi9j5rnmsival2vnh.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.meserapp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
