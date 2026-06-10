@@ -231,77 +231,75 @@ class LoginState extends State<Login> {
       final GoogleSignInAccount usuarioGoogle = await GoogleSignIn.instance
           .authenticate();
 
-      if (usuarioGoogle != null) {
-        final GoogleSignInAuthentication authGoogle =
-            usuarioGoogle.authentication;
+      final GoogleSignInAuthentication authGoogle =
+          usuarioGoogle.authentication;
 
-        final credential = GoogleAuthProvider.credential(
-          idToken: authGoogle.idToken,
-        );
+      final credential = GoogleAuthProvider.credential(
+        idToken: authGoogle.idToken,
+      );
 
-        final credencialFirebase = await FirebaseAuth.instance
-            .signInWithCredential(credential);
-        final usuario = credencialFirebase.user;
+      final credencialFirebase = await FirebaseAuth.instance
+          .signInWithCredential(credential);
+      final usuario = credencialFirebase.user;
 
-        if (usuario != null) {
-          final userDoc = await FirebaseFirestore.instance
+      if (usuario != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(usuario.uid)
+            .get();
+
+        if (!userDoc.exists) {
+          await FirebaseFirestore.instance
               .collection('usuarios')
               .doc(usuario.uid)
+              .set({
+                'uid': usuario.uid,
+                'email': usuario.email ?? '',
+                'rol': 'jefe',
+                'estado': 'activo',
+                'restauranteId': usuario.uid,
+                'nombre': usuario.displayName ?? 'Sin configurar',
+                'disponible': false,
+                'tareaActualId': null,
+              });
+
+          await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(usuario.uid)
+              .set({'configurado': false});
+
+          if (!mounted) return;
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ConfigurarLocal(restauranteId: usuario.uid),
+            ),
+          );
+        } else {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final restId = userData['restauranteId'];
+          final restDoc = await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(restId)
               .get();
 
-          if (!userDoc.exists) {
-            await FirebaseFirestore.instance
-                .collection('usuarios')
-                .doc(usuario.uid)
-                .set({
-                  'uid': usuario.uid,
-                  'email': usuario.email ?? '',
-                  'rol': 'jefe',
-                  'estado': 'activo',
-                  'restauranteId': usuario.uid,
-                  'nombre': usuario.displayName ?? 'Sin configurar',
-                  'disponible': false,
-                  'tareaActualId': null,
-                });
-
-            await FirebaseFirestore.instance
-                .collection('restaurantes')
-                .doc(usuario.uid)
-                .set({'configurado': false});
-
-            if (!mounted) return;
+          if (!mounted) return;
+          if (restDoc.exists && restDoc.data()?['configurado'] == true) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => const ContenedorStaff()),
+            );
+          } else {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (_) => ConfigurarLocal(restauranteId: usuario.uid),
+                builder: (_) => ConfigurarLocal(restauranteId: restId),
               ),
             );
-          } else {
-            final userData = userDoc.data() as Map<String, dynamic>;
-            final restId = userData['restauranteId'];
-            final restDoc = await FirebaseFirestore.instance
-                .collection('restaurantes')
-                .doc(restId)
-                .get();
-
-            if (!mounted) return;
-            if (restDoc.exists && restDoc.data()?['configurado'] == true) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const ContenedorStaff()),
-              );
-            } else {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ConfigurarLocal(restauranteId: restId),
-                ),
-              );
-            }
           }
         }
       }
-    } catch (e) {
+        } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
