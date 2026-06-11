@@ -315,7 +315,44 @@ class _StaffState extends State<Staff> {
         }
         final data = snapshot.data!.data() as Map<String, dynamic>?;
         if (data == null) {
-          return const Center(child: Text('La tarea fue cancelada.'));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.cancel_outlined,
+                    size: 60,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 15),
+                  const Text(
+                    'La tarea fue cancelada.',
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.indigo,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () {
+                      FirebaseFirestore.instance
+                          .collection('usuarios')
+                          .doc(uid)
+                          .update({
+                            'tareaActualId': null,
+                            'coleccionOrigen': FieldValue.delete(),
+                            'tipoTarea': FieldValue.delete(),
+                          });
+                    },
+                    child: const Text('Volver al panel'),
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         String titulo = coleccion == 'pedidos'

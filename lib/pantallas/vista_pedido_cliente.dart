@@ -65,7 +65,30 @@ class VistaPedidoCliente extends StatelessWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Mesa $numeroMesa - Tus Pedidos'),
+          title: FutureBuilder<DocumentSnapshot>(
+            future: appState.restauranteId != null
+                ? FirebaseFirestore.instance
+                      .collection('restaurantes')
+                      .doc(appState.restauranteId)
+                      .get()
+                : null,
+            builder: (context, snapshot) {
+              String nombre = 'Restaurante';
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                nombre = data['nombre'] ?? 'Restaurante';
+              }
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(nombre, overflow: TextOverflow.ellipsis),
+                  ),
+                  Text(' - Mesa $numeroMesa'),
+                ],
+              );
+            },
+          ),
           backgroundColor: Colors.indigo,
           foregroundColor: Colors.white,
           automaticallyImplyLeading: false,
@@ -160,7 +183,8 @@ class VistaPedidoCliente extends StatelessWidget {
                             if (estado == 'ESPERANDO_PAGO') {
                               colorEstado = Colors.redAccent;
                             }
-                            if (estado == 'PREPARANDO' || estado == 'PENDIENTE') {
+                            if (estado == 'PREPARANDO' ||
+                                estado == 'PENDIENTE') {
                               colorEstado = Colors.orange;
                             }
                             if (estado == 'LISTO') colorEstado = Colors.blue;

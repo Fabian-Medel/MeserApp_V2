@@ -56,53 +56,50 @@ class Mesas extends StatelessWidget {
                   ? 'Libre'
                   : (estado == 1 ? 'Ocupada' : 'Limpiando');
 
-              return GestureDetector(
-                onTap: estado == 0
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => LectorQR(
-                              numeroMesa: numeroMesa,
-                              idRestauranteDetectado: restauranteId,
-                            ),
-                          ),
-                        );
-                      }
-                    : null,
-                child: Card(
-                  color: colorMesa,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'Mesa $numeroMesa',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+              return Card(
+                color: colorMesa,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Mesa $numeroMesa',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
                       ),
-                      Icon(
-                        estado == 0
-                            ? Icons.check_circle
-                            : (estado == 1
+                    ),
+                    Icon(
+                      estado == 0
+                          ? Icons.check_circle
+                          : (estado == 1
                                 ? Icons.cancel
                                 : Icons.cleaning_services),
-                        color: Colors.white,
-                        size: 40,
-                      ),
-                      Text(
-                        textoMesa,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ],
-                  ),
+                      color: Colors.white,
+                      size: 40,
+                    ),
+                    Text(
+                      textoMesa,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ],
                 ),
               );
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LectorQR()),
+          );
+        },
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('Escanear QR'),
       ),
     );
   }

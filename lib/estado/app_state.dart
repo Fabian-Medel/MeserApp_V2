@@ -4,12 +4,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
+enum EstadoConexion { online, offline, restaurada }
+
 class AppState extends ChangeNotifier {
   String? restauranteId;
   int? mesaSeleccionada;
   List<Map<String, dynamic>> carrito = [];
+  List<Map<String, dynamic>> _carritoRespaldo = [];
 
   bool estaOffline = false;
+  EstadoConexion estadoConexion = EstadoConexion.online;
+
   late Box _colaSyncBox;
   late Box _pedidosBox;
 
@@ -18,88 +23,136 @@ class AppState extends ChangeNotifier {
     _pedidosBox = Hive.box('pedidos');
     _escucharConexion();
   }
-  void _escucharConexion() {
-    Connectivity().onConnectivityChanged.listen((ConnectivityResult result) async {
-      estaOffline = result == ConnectivityResult.none;
-      notifyListeners();
 
-      if (!estaOffline) {
+  void limpiarSesionGlobal() {
+    restauranteId = null;
+    mesaSeleccionada = null;
+    carrito.clear();
+    _carritoRespaldo.clear();
+    notifyListeners();
+  }
+
+  void limpiarMesaYCarrito() {
+    if (mesaSeleccionada != null || carrito.isNotEmpty) {
+      mesaSeleccionada = null;
+      carrito.clear();
+      _carritoRespaldo.clear();
+      notifyListeners();
+    }
+  }
+
+  void _escucharConexion() {
+    Connectivity().onConnectivityChanged.listen((
+      ConnectivityResult result,
+    ) async {
+      bool nuevoOffline = result == ConnectivityResult.none;
+
+      if (nuevoOffline) {
+        estaOffline = true;
+        estadoConexion = EstadoConexion.offline;
+        notifyListeners();
+      } else if (estaOffline && !nuevoOffline) {
+        estaOffline = false;
+        estadoConexion = EstadoConexion.restaurada;
+        notifyListeners();
+
         await _sincronizarCola();
+
+        Future.delayed(const Duration(seconds: 3), () {
+          if (estadoConexion == EstadoConexion.restaurada) {
+            estadoConexion = EstadoConexion.online;
+            notifyListeners();
+          }
+        });
+      } else if (!estaOffline && !nuevoOffline) {
+        estadoConexion = EstadoConexion.online;
+        notifyListeners();
       }
     });
   }
 
   Future<void> _guardarEnCola(String tipo, Map<String, dynamic> datos) async {
-      final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
-      cola.add({'tipo': tipo, 'datos': datos, 'timestamp': DateTime.now().millisecondsSinceEpoch});
-      await _colaSyncBox.put('operaciones', cola);
-    }
+    final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+    cola.add({
+      'tipo': tipo,
+      'datos': datos,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    });
+    await _colaSyncBox.put('operaciones', cola);
+  }
 
-    Future<void> _sincronizarCola() async {
-      final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
-      if (cola.isEmpty) return;
+  Future<void> _sincronizarCola() async {
+    final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+    if (cola.isEmpty) return;
 
-      for (final operacion in List.from(cola)) {
-        try {
-          await _ejecutarOperacion(operacion);
-          cola.remove(operacion);
-          await _colaSyncBox.put('operaciones', cola);
-        } catch (e) {
-          debugPrint("Fallo al sincronizar operación, se mantiene en cola: $e");
-          break;
-        }
+    for (final operacion in List.from(cola)) {
+      try {
+        await _ejecutarOperacion(operacion);
+        cola.remove(operacion);
+        await _colaSyncBox.put('operaciones', cola);
+      } catch (e) {
+        debugPrint(e.toString());
+        break;
       }
     }
+  }
 
   Future<void> _ejecutarOperacion(Map operacion) async {
-      
-      final Map<String, dynamic> datosFirebase = Map<String, dynamic>.from(operacion['datos']);
-      
-      if (datosFirebase['timestampEpoch'] != null) {
-        datosFirebase['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(datosFirebase['timestampEpoch']);
-        datosFirebase.remove('timestampEpoch');
-      }
-      
-      final String docId = datosFirebase['idLocal'] ?? '';
+    final Map<String, dynamic> datosFirebase = Map<String, dynamic>.from(
+      operacion['datos'],
+    );
 
-      switch (operacion['tipo']) {
-        case 'crear_pedido':
-          await FirebaseFirestore.instance
-              .collection('restaurantes')
-              .doc(operacion['datos']['restauranteId'])
-              .collection('pedidos')
-              .doc(docId)
-              .set(datosFirebase);
-          break;
-        case 'crear_notificacion':
-          await FirebaseFirestore.instance
-              .collection('restaurantes')
-              .doc(datosFirebase['restauranteId'])
-              .collection('notificaciones')
-              .doc(docId)
-              .set(datosFirebase);
-          break;
-        case 'actualizar_mesa':
-          await FirebaseFirestore.instance
-              .collection('restaurantes')
-              .doc(datosFirebase['restauranteId'])
-              .collection('mesas')
-              .doc(docId)
-              .update({'estado': datosFirebase['estado']});
-          break;
-      }
+    if (datosFirebase['timestampEpoch'] != null) {
+      datosFirebase['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(
+        datosFirebase['timestampEpoch'],
+      );
+      datosFirebase.remove('timestampEpoch');
     }
+
+    final String docId = datosFirebase['idLocal'] ?? '';
+
+    switch (operacion['tipo']) {
+      case 'crear_pedido':
+        await FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(operacion['datos']['restauranteId'])
+            .collection('pedidos')
+            .doc(docId)
+            .set(datosFirebase);
+        break;
+      case 'crear_notificacion':
+        await FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(datosFirebase['restauranteId'])
+            .collection('notificaciones')
+            .doc(docId)
+            .set(datosFirebase);
+        break;
+      case 'actualizar_mesa':
+        await FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(datosFirebase['restauranteId'])
+            .collection('mesas')
+            .doc(docId)
+            .update({'estado': datosFirebase['estado']});
+        break;
+    }
+  }
 
   void setRestauranteId(String id) {
     restauranteId = id;
     notifyListeners();
   }
 
-
-  Future<void> actualizarMesaEnFirebase(int numeroMesa, int nuevoEstado) async {
+  Future<void> actualizarMesaEnFirebase(
+    int numeroMesa,
+    int nuevoEstado, [
+    String? forceRestId,
+  ]) async {
     String? idDocumento =
-        restauranteId ?? FirebaseAuth.instance.currentUser?.uid;
+        forceRestId ?? restauranteId ?? FirebaseAuth.instance.currentUser?.uid;
     if (idDocumento == null) return;
+
     final datosMesa = {
       'restauranteId': idDocumento,
       'idLocal': '$numeroMesa',
@@ -123,15 +176,18 @@ class AppState extends ChangeNotifier {
   }
 
   void ocuparMesa(int numeroMesa) async {
+    final currentRestId = restauranteId;
     mesaSeleccionada = numeroMesa;
     carrito.clear();
-    await actualizarMesaEnFirebase(numeroMesa, 1);
+    _carritoRespaldo.clear();
 
-    if (restauranteId != null && !estaOffline) {
+    await actualizarMesaEnFirebase(numeroMesa, 1, currentRestId);
+
+    if (currentRestId != null && !estaOffline) {
       try {
         final pedidosViejos = await FirebaseFirestore.instance
             .collection('restaurantes')
-            .doc(restauranteId)
+            .doc(currentRestId)
             .collection('pedidos')
             .where('mesa', isEqualTo: numeroMesa)
             .get();
@@ -139,14 +195,15 @@ class AppState extends ChangeNotifier {
         if (pedidosViejos.docs.isNotEmpty) {
           final batch = FirebaseFirestore.instance.batch();
           for (var doc in pedidosViejos.docs) {
-            if (doc.data()['estado'] != 'archivado') {
+            final data = doc.data();
+            if (data['estado'] != 'archivado') {
               batch.update(doc.reference, {'estado': 'archivado'});
             }
           }
           await batch.commit();
         }
       } catch (e) {
-        debugPrint("Error al archivar pedidos viejos en modo offline/inestable: $e");
+        debugPrint(e.toString());
       }
     }
     notifyListeners();
@@ -180,14 +237,17 @@ class AppState extends ChangeNotifier {
   }
 
   Future<bool> enviarPedidoTarjeta() async {
-    if (mesaSeleccionada != null && restauranteId != null) {
+    final currentRestId = restauranteId;
+    final currentMesa = mesaSeleccionada;
+
+    if (currentMesa != null && currentRestId != null) {
       final listaFinal = _agruparCarrito();
       final String localId = DateTime.now().millisecondsSinceEpoch.toString();
-      
+
       final Map<String, dynamic> pedidoData = {
         'idLocal': localId,
-        'restauranteId': restauranteId,
-        'mesa': mesaSeleccionada!,
+        'restauranteId': currentRestId,
+        'mesa': currentMesa,
         'pedido': listaFinal,
         'total': totalCarrito,
         'estado': 'pendiente',
@@ -198,17 +258,20 @@ class AppState extends ChangeNotifier {
 
       await _pedidosBox.put(localId, pedidoData);
       carrito.clear();
-      notifyListeners();      
-      
+      _carritoRespaldo.clear();
+      notifyListeners();
+
       if (!estaOffline) {
         try {
-          final Map<String, dynamic> datosDirectos = Map<String, dynamic>.from(pedidoData);
+          final Map<String, dynamic> datosDirectos = Map<String, dynamic>.from(
+            pedidoData,
+          );
           datosDirectos['timestamp'] = FieldValue.serverTimestamp();
           datosDirectos.remove('timestampEpoch');
 
           await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('pedidos')
               .doc(localId)
               .set(datosDirectos);
@@ -217,25 +280,27 @@ class AppState extends ChangeNotifier {
         } catch (e) {
           await _guardarEnCola('crear_pedido', pedidoData);
         }
-
       } else {
         await _guardarEnCola('crear_pedido', pedidoData);
       }
-      return true;         
+      return true;
     }
     return false;
   }
 
   Future<String?> enviarPedidoEfectivo() async {
-    if (mesaSeleccionada != null && restauranteId != null) {
+    final currentRestId = restauranteId;
+    final currentMesa = mesaSeleccionada;
+
+    if (currentMesa != null && currentRestId != null) {
       final listaFinal = _agruparCarrito();
       final String localId = DateTime.now().millisecondsSinceEpoch.toString();
-      final String notifId = 'notif_$localId'; 
+      final String notifId = 'notif_$localId';
 
       final Map<String, dynamic> pedidoData = {
         'idLocal': localId,
-        'restauranteId': restauranteId,
-        'mesa': mesaSeleccionada!,
+        'restauranteId': currentRestId,
+        'mesa': currentMesa,
         'pedido': listaFinal,
         'total': totalCarrito,
         'estado': 'esperando_pago',
@@ -246,22 +311,28 @@ class AppState extends ChangeNotifier {
 
       final Map<String, dynamic> notifData = {
         'idLocal': notifId,
-        'restauranteId': restauranteId,
+        'restauranteId': currentRestId,
         'tipo': 'pago_efectivo',
-        'mesa': mesaSeleccionada!,
+        'mesa': currentMesa,
         'estado': 'pendiente',
         'meseroAsignadoId': null,
         'timestampEpoch': DateTime.now().millisecondsSinceEpoch,
       };
 
       await _pedidosBox.put(localId, pedidoData);
+
+      _carritoRespaldo = List.from(carrito);
       carrito.clear();
       notifyListeners();
 
       if (!estaOffline) {
         try {
-          final Map<String, dynamic> pDirecto = Map<String, dynamic>.from(pedidoData);
-          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(notifData);
+          final Map<String, dynamic> pDirecto = Map<String, dynamic>.from(
+            pedidoData,
+          );
+          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(
+            notifData,
+          );
           pDirecto['timestamp'] = FieldValue.serverTimestamp();
           nDirecto['timestamp'] = FieldValue.serverTimestamp();
           pDirecto.remove('timestampEpoch');
@@ -269,20 +340,20 @@ class AppState extends ChangeNotifier {
 
           await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('pedidos')
               .doc(localId)
               .set(pDirecto);
-              
+
           await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('notificaciones')
               .doc(notifId)
               .set(nDirecto);
 
           await _pedidosBox.delete(localId);
-          return notifId; 
+          return notifId;
         } catch (e) {
           await _guardarEnCola('crear_pedido', pedidoData);
           await _guardarEnCola('crear_notificacion', notifData);
@@ -296,15 +367,114 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  Future<void> cancelarPagoEfectivo(String notifId) async {
+    final currentRestId = restauranteId;
+    String pedidoId = notifId.replaceFirst('notif_', '');
+    List<dynamic> itemsRestaurar = [];
+
+    if (_carritoRespaldo.isNotEmpty) {
+      carrito = List.from(_carritoRespaldo);
+      _carritoRespaldo.clear();
+    } else {
+      if (currentRestId != null) {
+        try {
+          DocumentSnapshot doc = await FirebaseFirestore.instance
+              .collection('restaurantes')
+              .doc(currentRestId)
+              .collection('pedidos')
+              .doc(pedidoId)
+              .get(const GetOptions(source: Source.cache));
+
+          if (!doc.exists && !estaOffline) {
+            doc = await FirebaseFirestore.instance
+                .collection('restaurantes')
+                .doc(currentRestId)
+                .collection('pedidos')
+                .doc(pedidoId)
+                .get();
+          }
+
+          if (doc.exists) {
+            final data = doc.data() as Map<String, dynamic>;
+            itemsRestaurar = data['pedido'] as List<dynamic>;
+          }
+        } catch (e) {
+          debugPrint(e.toString());
+        }
+      }
+
+      if (itemsRestaurar.isEmpty) {
+        final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+        for (var op in cola) {
+          if (op['tipo'] == 'crear_pedido' &&
+              op['datos']['idLocal'] == pedidoId) {
+            itemsRestaurar = op['datos']['pedido'];
+            break;
+          }
+        }
+      }
+
+      if (itemsRestaurar.isNotEmpty) {
+        carrito.clear();
+        for (var item in itemsRestaurar) {
+          for (int i = 0; i < item['cantidad']; i++) {
+            carrito.add({
+              'nombre': item['nombre'],
+              'precio': item['precio'],
+              'urlImagen': item['urlImagen'],
+              'descripcion': item['descripcion'],
+              'tiempo': item['tiempo'],
+            });
+          }
+        }
+      }
+    }
+
+    final cola = _colaSyncBox.get('operaciones', defaultValue: []) as List;
+    cola.removeWhere(
+      (op) =>
+          op['tipo'] == 'crear_notificacion' &&
+          op['datos']['idLocal'] == notifId,
+    );
+    cola.removeWhere(
+      (op) =>
+          op['tipo'] == 'crear_pedido' && op['datos']['idLocal'] == pedidoId,
+    );
+    await _colaSyncBox.put('operaciones', cola);
+
+    if (currentRestId != null) {
+      try {
+        FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(currentRestId)
+            .collection('notificaciones')
+            .doc(notifId)
+            .delete();
+        FirebaseFirestore.instance
+            .collection('restaurantes')
+            .doc(currentRestId)
+            .collection('pedidos')
+            .doc(pedidoId)
+            .delete();
+      } catch (e) {
+        debugPrint(e.toString());
+      }
+    }
+    notifyListeners();
+  }
+
   Future<String?> solicitarAsistencia({String tipo = 'asistencia'}) async {
-    if (mesaSeleccionada != null && restauranteId != null) {
+    final currentRestId = restauranteId;
+    final currentMesa = mesaSeleccionada;
+
+    if (currentMesa != null && currentRestId != null) {
       final String localId = 'asist_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       final Map<String, dynamic> notifData = {
         'idLocal': localId,
-        'restauranteId': restauranteId,
+        'restauranteId': currentRestId,
         'tipo': tipo,
-        'mesa': mesaSeleccionada!,
+        'mesa': currentMesa,
         'estado': 'pendiente',
         'meseroAsignadoId': null,
         'timestampEpoch': DateTime.now().millisecondsSinceEpoch,
@@ -312,13 +482,15 @@ class AppState extends ChangeNotifier {
 
       if (!estaOffline) {
         try {
-          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(notifData);
+          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(
+            notifData,
+          );
           nDirecto['timestamp'] = FieldValue.serverTimestamp();
           nDirecto.remove('timestampEpoch');
 
           await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('notificaciones')
               .doc(localId)
               .set(nDirecto);
@@ -334,19 +506,26 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-
   Future<void> solicitarLimpieza() async {
-    if (mesaSeleccionada != null && restauranteId != null) {
-      int mesaCerrada = mesaSeleccionada!;
+    final currentRestId = restauranteId;
+    final currentMesa = mesaSeleccionada;
+
+    if (currentMesa != null && currentRestId != null) {
+      mesaSeleccionada = null;
+      carrito.clear();
+      _carritoRespaldo.clear();
+      restauranteId = null;
+      notifyListeners();
+
       final String localId = 'limp_${DateTime.now().millisecondsSinceEpoch}';
 
       if (!estaOffline) {
         try {
           final pedidosActivos = await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('pedidos')
-              .where('mesa', isEqualTo: mesaCerrada)
+              .where('mesa', isEqualTo: currentMesa)
               .where('estado', whereIn: ['pendiente', 'preparando', 'listo'])
               .get();
 
@@ -358,17 +537,17 @@ class AppState extends ChangeNotifier {
             await batch.commit();
           }
         } catch (e) {
-          debugPrint("Error limpiando órdenes de mesa de forma síncrona: $e");
+          debugPrint(e.toString());
         }
       }
 
-      await actualizarMesaEnFirebase(mesaCerrada, 2);
+      await actualizarMesaEnFirebase(currentMesa, 2, currentRestId);
 
       final Map<String, dynamic> notifData = {
         'idLocal': localId,
-        'restauranteId': restauranteId,
+        'restauranteId': currentRestId,
         'tipo': 'limpieza',
-        'mesa': mesaCerrada,
+        'mesa': currentMesa,
         'estado': 'pendiente',
         'meseroAsignadoId': null,
         'timestampEpoch': DateTime.now().millisecondsSinceEpoch,
@@ -376,13 +555,15 @@ class AppState extends ChangeNotifier {
 
       if (!estaOffline) {
         try {
-          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(notifData);
+          final Map<String, dynamic> nDirecto = Map<String, dynamic>.from(
+            notifData,
+          );
           nDirecto['timestamp'] = FieldValue.serverTimestamp();
           nDirecto.remove('timestampEpoch');
 
           await FirebaseFirestore.instance
               .collection('restaurantes')
-              .doc(restauranteId)
+              .doc(currentRestId)
               .collection('notificaciones')
               .doc(localId)
               .set(nDirecto);
@@ -392,32 +573,34 @@ class AppState extends ChangeNotifier {
       } else {
         await _guardarEnCola('crear_notificacion', notifData);
       }
+    }
+  }
 
-      mesaSeleccionada = null;
-      carrito.clear();
-      restauranteId = null;
-      notifyListeners();
-    }
-  }
   void abandonarMesaVirtual() {
-    if (mesaSeleccionada != null && restauranteId != null) {
-      actualizarMesaEnFirebase(mesaSeleccionada!, 0);
+    final currentRestId = restauranteId;
+    final currentMesa = mesaSeleccionada;
+
+    if (currentMesa != null && currentRestId != null) {
+      actualizarMesaEnFirebase(currentMesa, 0, currentRestId);
       mesaSeleccionada = null;
       carrito.clear();
+      _carritoRespaldo.clear();
       restauranteId = null;
       notifyListeners();
     }
   }
+
   Future<bool> habilitarMesa(int numeroMesa) async {
-    final String? idDocumento = restauranteId ?? FirebaseAuth.instance.currentUser?.uid;
+    final String? idDocumento =
+        restauranteId ?? FirebaseAuth.instance.currentUser?.uid;
     if (idDocumento == null) return false;
 
     try {
-      await actualizarMesaEnFirebase(numeroMesa, 0);
+      await actualizarMesaEnFirebase(numeroMesa, 0, idDocumento);
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint("Error al habilitar mesa: $e");
+      debugPrint(e.toString());
       return false;
     }
   }
@@ -434,7 +617,7 @@ class AppState extends ChangeNotifier {
           'cantidad': 1,
           'urlImagen': item['urlImagen'],
           'descripcion': item['descripcion'],
-          'tiempo': item['tiempo']
+          'tiempo': item['tiempo'],
         };
       }
     }

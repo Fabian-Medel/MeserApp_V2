@@ -147,10 +147,32 @@ class _MenuState extends State<Menu> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            appState.mesaSeleccionada != null
-                ? 'Menú - Mesa ${appState.mesaSeleccionada!}'
-                : 'Consulta de Menú',
+          title: FutureBuilder<DocumentSnapshot>(
+            future: appState.restauranteId != null
+                ? FirebaseFirestore.instance
+                      .collection('restaurantes')
+                      .doc(appState.restauranteId)
+                      .get()
+                : null,
+            builder: (context, snapshot) {
+              String nombre = 'Menú';
+              if (snapshot.hasData && snapshot.data!.exists) {
+                final data = snapshot.data!.data() as Map<String, dynamic>;
+                nombre = data['nombre'] ?? 'Menú';
+              }
+              if (appState.mesaSeleccionada != null) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(nombre, overflow: TextOverflow.ellipsis),
+                    ),
+                    Text(' - Mesa ${appState.mesaSeleccionada!}'),
+                  ],
+                );
+              }
+              return const Text('Consulta de Menú');
+            },
           ),
           leading: appState.mesaSeleccionada != null
               ? IconButton(
@@ -162,7 +184,6 @@ class _MenuState extends State<Menu> {
           actions: [
             if (appState.mesaSeleccionada != null &&
                 appState.restauranteId != null)
-              // ANTI-SPAM DE ASISTENCIA
               StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance
                     .collection('restaurantes')

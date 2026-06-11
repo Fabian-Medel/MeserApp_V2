@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../estado/app_state.dart';
 import 'vista_pedido_cliente.dart';
+import 'carrito.dart';
 
 class EsperaPago extends StatefulWidget {
   final String notificacionId;
@@ -14,6 +15,7 @@ class EsperaPago extends StatefulWidget {
 
 class _EsperaPagoState extends State<EsperaPago> {
   bool _navegando = false;
+  bool _cancelando = false;
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +26,7 @@ class _EsperaPagoState extends State<EsperaPago> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'Por favor, espera a que el mesero confirme tu pago.',
+              'Por favor, espera a que el mesero confirme tu pago o cancela la operación.',
             ),
             backgroundColor: Colors.orange,
           ),
@@ -54,7 +56,8 @@ class _EsperaPagoState extends State<EsperaPago> {
               final estado = data['estado'];
 
               if ((estado == 'completado' || estado == 'archivado') &&
-                  !_navegando) {
+                  !_navegando &&
+                  !_cancelando) {
                 _navegando = true;
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   Navigator.pushAndRemoveUntil(
@@ -75,15 +78,15 @@ class _EsperaPagoState extends State<EsperaPago> {
               }
             }
 
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(30.0),
+                padding: const EdgeInsets.all(30.0),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.payments, size: 100, color: Colors.white),
-                    SizedBox(height: 30),
-                    Text(
+                    const Icon(Icons.payments, size: 100, color: Colors.white),
+                    const SizedBox(height: 30),
+                    const Text(
                       'Un mesero está en camino a tu mesa para procesar el pago en efectivo.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
@@ -92,12 +95,57 @@ class _EsperaPagoState extends State<EsperaPago> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 40),
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 20),
-                    Text(
+                    const SizedBox(height: 40),
+                    if (_cancelando)
+                      const CircularProgressIndicator(color: Colors.red)
+                    else
+                      const CircularProgressIndicator(color: Colors.white),
+                    const SizedBox(height: 20),
+                    const Text(
                       'Por favor espera...',
                       style: TextStyle(color: Colors.white70, fontSize: 18),
+                    ),
+                    const SizedBox(height: 50),
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.cancel),
+                      label: const Text(
+                        'Cancelar Pago',
+                        style: TextStyle(fontSize: 16),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 15,
+                          horizontal: 20,
+                        ),
+                      ),
+                      onPressed: _cancelando
+                          ? null
+                          : () async {
+                              setState(() => _cancelando = true);
+
+                              await appState.cancelarPagoEfectivo(
+                                widget.notificacionId,
+                              );
+
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Pago cancelado. Puedes modificar tu carrito.',
+                                    ),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const Carrito(),
+                                  ),
+                                );
+                              }
+                            },
                     ),
                   ],
                 ),

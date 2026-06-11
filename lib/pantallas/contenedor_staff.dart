@@ -50,6 +50,7 @@ class _ContenedorStaffState extends State<ContenedorStaff> {
           if (appState.restauranteId != restId) {
             appState.setRestauranteId(restId);
           }
+          appState.limpiarMesaYCarrito();
         });
 
         List<Widget> pantallas = [];

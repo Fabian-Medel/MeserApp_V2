@@ -4,14 +4,7 @@ import '../estado/app_state.dart';
 import 'menu.dart';
 
 class LectorQR extends StatefulWidget {
-  final int numeroMesa;
-  final String idRestauranteDetectado;
-
-  const LectorQR({
-    super.key,
-    required this.numeroMesa,
-    required this.idRestauranteDetectado,
-  });
+  const LectorQR({super.key});
 
   @override
   State<LectorQR> createState() => _LectorQRState();
@@ -22,27 +15,39 @@ class _LectorQRState extends State<LectorQR> {
 
   void procesarEscaneoExitoso(String? codigoLeido) {
     if (yaDetectado) return;
+    if (codigoLeido == null) return;
 
-    String esperado = '${widget.numeroMesa}|${widget.idRestauranteDetectado}';
+    final partes = codigoLeido.trim().split('|');
 
-    if (codigoLeido == null || codigoLeido.trim() == esperado) {
-      setState(() => yaDetectado = true);
+    if (partes.length == 2) {
+      int? numeroMesa = int.tryParse(partes[0]);
+      String idRestaurante = partes[1];
 
-      appState.setRestauranteId(widget.idRestauranteDetectado);
-      appState.ocuparMesa(widget.numeroMesa);
+      if (numeroMesa != null && idRestaurante.isNotEmpty) {
+        setState(() => yaDetectado = true);
 
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const Menu()),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Código QR erróneo. No corresponde a esta mesa.'),
-          backgroundColor: Colors.red,
-        ),
-      );
+        appState.setRestauranteId(idRestaurante);
+        appState.ocuparMesa(numeroMesa);
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const Menu()),
+        );
+        return;
+      }
     }
+
+    setState(() => yaDetectado = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Código QR inválido o no reconocido.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => yaDetectado = false);
+    });
   }
 
   @override
@@ -71,23 +76,6 @@ class _LectorQRState extends State<LectorQR> {
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.greenAccent, width: 4),
                 borderRadius: BorderRadius.circular(20),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.check),
-                label: const Text('Simular lectura de QR'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(250, 55),
-                ),
-                onPressed: () => procesarEscaneoExitoso(null),
               ),
             ),
           ),

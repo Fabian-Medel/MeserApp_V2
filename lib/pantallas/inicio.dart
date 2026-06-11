@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../estado/app_state.dart';
 import 'seleccion_restaurante.dart';
 import 'login.dart';
 import 'contenedor_staff.dart';
@@ -15,6 +16,14 @@ class Inicio extends StatefulWidget {
 
 class _InicioState extends State<Inicio> {
   bool _verificando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      appState.limpiarSesionGlobal();
+    });
+  }
 
   void _ingresarComoRestaurante() async {
     final usuario = FirebaseAuth.instance.currentUser;

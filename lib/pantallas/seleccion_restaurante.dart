@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'mesas.dart';
+import 'qr.dart';
 
 class SeleccionRestaurante extends StatelessWidget {
   const SeleccionRestaurante({super.key});
@@ -76,6 +77,18 @@ class SeleccionRestaurante extends StatelessWidget {
             },
           );
         },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const LectorQR()),
+          );
+        },
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.qr_code_scanner),
+        label: const Text('Escanear QR'),
       ),
     );
   }
