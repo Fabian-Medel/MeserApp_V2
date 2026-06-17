@@ -29,6 +29,8 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
+
+
     sdk: flutter
   mobile_scanner: ^7.2.0 #Libreria para lector qr
 
@@ -47,6 +49,8 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   connectivity_plus: ^5.0.0
+  google_generative_ai: ^0.4.6
+  uuid: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +75,8 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+  assets:
+    - assets/images/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

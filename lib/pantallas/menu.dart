@@ -5,6 +5,7 @@ import '../estado/app_state.dart';
 import 'carrito.dart';
 import 'detalle_plato.dart';
 import 'inicio.dart';
+import '../features/assistant/presentation/chat_screen.dart';
 
 class Menu extends StatefulWidget {
   const Menu({super.key});
@@ -442,6 +443,36 @@ class _MenuState extends State<Menu> {
               },
             );
           },
+        ),
+        floatingActionButton: SizedBox(
+          height: 70,
+          child: FloatingActionButton.extended(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+            },
+            backgroundColor: Colors.indigo,
+            elevation: 8,
+            icon: CircleAvatar(
+              radius: 26,
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(2.0),
+                child: Image.asset('assets/images/sofia.png', fit: BoxFit.contain),
+              ),
+            ),
+            label: const Text(
+              'SofIA',
+              style: TextStyle(
+                color: Colors.white, 
+                fontWeight: FontWeight.bold, 
+                fontSize: 22,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
         ),
         bottomNavigationBar: ListenableBuilder(
           listenable: appState,
